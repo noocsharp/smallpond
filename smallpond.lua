@@ -41,6 +41,7 @@ commands = {
 function parse(text)
 	local i = 1
 	return function()
+		i = i + #(string.match(text, "^%s*", i) or "")
 		if i >= #text then return nil end
 		local cmd = string.match(text, "^\\(%a+)", i)
 		if cmd then
@@ -49,7 +50,7 @@ function parse(text)
 			return data
 		end
 
-		local s, e, note = string.find(text, "^%s*([abcdefg])", i)
+		local s, e, note = string.find(text, "^([abcdefg])", i)
 		if note then
 			i = i + e - s + 1
 			return {command="newnote", note=note}
