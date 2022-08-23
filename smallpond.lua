@@ -4,6 +4,19 @@ local em = 8
 local noteheadBlock = 0xE0A4
 local gClef = 0xE050
 local fClef = 0xE062
+local numerals = {
+	['0'] = 0xE080,
+	['1'] = 0xE081,
+	['2'] = 0xE082,
+	['3'] = 0xE083,
+	['4'] = 0xE084,
+	['5'] = 0xE085,
+	['6'] = 0xE086,
+	['7'] = 0xE087,
+	['8'] = 0xE088,
+	['9'] = 0xE089
+}
+
 local treble = {
 	glyph = gClef,
 	place = function(char)
@@ -34,6 +47,17 @@ commands = {
 			else
 				error(string.format("unknown clef %s", string.sub(text, start)))
 			end
+		end
+	},
+	time = {
+		parse = function(text, start)
+			-- move past "\time "
+			start = start + 6
+			local num, denom = string.match(text, "^(%d+)/(%d+)", start)
+			if num == nil or denom == nil then
+				error(string.format("bad time signature format"))
+			end
+			return #"\\time " + #num + #denom + 1, {command="changetime", num=num, denom=denom}
 		end
 	}
 }
@@ -79,6 +103,10 @@ command_dispatch = {
 			table.insert(staff, {kind="clef", class=bass, x=x, y=em})
 		end
 		x = x + 40
+	end,
+	changetime = function(data)
+		table.insert(staff, {kind="time", x=x, y=em, num=data.num, denom=data.denom})
+		x = x + 30
 	end
 }
 
@@ -102,5 +130,9 @@ for i, el in ipairs(staff) do
 		draw_glyph(noteheadBlock, xoffset + el.x, yoffset + el.y)
 	elseif el.kind == "clef" then
 		draw_glyph(el.class.glyph, xoffset + el.x, yoffset + el.y)
+	elseif el.kind == "time" then
+		-- TODO: draw multidigit time signatures properly
+		draw_glyph(numerals[el.num], xoffset + el.x, yoffset + el.y)
+		draw_glyph(numerals[el.denom], xoffset + el.x, yoffset + el.y + 2*em)
 	end
 end
