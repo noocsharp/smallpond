@@ -1,7 +1,12 @@
 -- parse
 local em = 8
 
-local noteheadBlock = 0xE0A4
+local Glyph = {
+	["noteheadWhole"] = 0xE0A2,
+	["noteheadHalf"] = 0xE0A3,
+	["noteheadBlack"] = 0xE0A4
+}
+
 local gClef = 0xE050
 local fClef = 0xE062
 local numerals = {
@@ -19,6 +24,7 @@ local numerals = {
 
 local treble = {
 	glyph = gClef,
+	yoff = 3*em,
 	place = function(char)
 		local NOTES = "abcdefg"
 		local s, _ = string.find(NOTES, char)
@@ -28,6 +34,7 @@ local treble = {
 
 local bass = {
 	glyph = fClef,
+	yoff = em,
 	place = function(char)
 		local NOTES = "abcdefg"
 		local s, _ = string.find(NOTES, char)
@@ -74,10 +81,10 @@ function parse(text)
 			return data
 		end
 
-		local s, e, note = string.find(text, "^([abcdefg])", i)
+		local s, e, note, count = string.find(text, "^([abcdefg])([1248]?)", i)
 		if note then
 			i = i + e - s + 1
-			return {command="newnote", note=note}
+			return {command="newnote", note=note, count=tonumber(count)}
 		end
 
 		error("unknown token")
@@ -86,13 +93,27 @@ end
 
 f = assert(io.open("score.sp"))
 
-local x = 10
+local time = 0 -- time in increments of denom
 staff = {}
 command_dispatch = {
 	newnote = function(data)
 		local i = staff.clef.place(data.note)
-		table.insert(staff, {kind="notehead", x=x, y=(em*i) / 2})
-		x = x + 20
+		if data.count == 1 then
+			table.insert(staff, {kind="notehead", glyph="noteheadWhole", time=time, y=(em*i) / 2})
+		elseif data.count == 2 then
+			local head = {kind="notehead", glyph="noteheadHalf", time=time, y=(em*i) / 2}
+			table.insert(staff, head)
+			table.insert(staff, {kind="stem", head=head})
+		elseif data.count == 4 then
+			local head = {kind="notehead", glyph="noteheadBlack", time=time, y=(em*i) / 2}
+			table.insert(staff, head)
+			table.insert(staff, {kind="stem", head=head})
+		elseif data.count == 8 then
+			table.insert(staff, {kind="notehead", glyph="noteheadBlack", time=time, y=(em*i) / 2})
+		else
+			error("oops")
+		end
+		time = time + data.count * 10
 	end,
 	changeclef = function(data)
 		if data.kind == "treble" then
@@ -102,11 +123,9 @@ command_dispatch = {
 			staff.clef = bass
 			table.insert(staff, {kind="clef", class=bass, x=x, y=em})
 		end
-		x = x + 40
 	end,
 	changetime = function(data)
 		table.insert(staff, {kind="time", x=x, y=em, num=data.num, denom=data.denom})
-		x = x + 30
 	end
 }
 
@@ -116,23 +135,31 @@ for tok in parse(f:read("*a")) do
 end
 
 -- determine staff width, the +20 is a hack, should be determined from notehead width + some padding
-local staff_width = staff[#staff].x + 20
 local yoffset = 20
 local xoffset = 20
-
--- draw staff
-for y=0,em*4,em do
-	draw_line(xoffset, y + yoffset, staff_width + xoffset, y + yoffset)
-end
+local x = 10
+local lasttime = 0
 
 for i, el in ipairs(staff) do
 	if el.kind == "notehead" then
-		draw_glyph(noteheadBlock, xoffset + el.x, yoffset + el.y)
+		draw_glyph(Glyph[el.glyph], xoffset + x, yoffset + el.y)
+		el.x = x
+		x = x + (el.time - lasttime)
+		lasttime = el.time
+	elseif el.kind == "stem" then
+		draw_line(1, el.head.x + xoffset + 0.5, yoffset + el.head.y + .188*em, el.head.x + xoffset + 0.5, el.head.y + yoffset + 3.5*em)
 	elseif el.kind == "clef" then
-		draw_glyph(el.class.glyph, xoffset + el.x, yoffset + el.y)
+		draw_glyph(el.class.glyph, xoffset + x, yoffset + el.y)
+		x = x + 30
 	elseif el.kind == "time" then
 		-- TODO: draw multidigit time signatures properly
-		draw_glyph(numerals[el.num], xoffset + el.x, yoffset + el.y)
-		draw_glyph(numerals[el.denom], xoffset + el.x, yoffset + el.y + 2*em)
+		draw_glyph(numerals[el.num], xoffset + x, yoffset + el.y)
+		draw_glyph(numerals[el.denom], xoffset + x, yoffset + el.y + 2*em)
+		x = x + 30
 	end
+end
+
+-- draw staff
+for y=0,em*4,em do
+	draw_line(1, xoffset, y + yoffset, x + xoffset, y + yoffset)
 end

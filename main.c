@@ -18,6 +18,7 @@ cairo_font_face_t *cface;
 int
 draw_line(lua_State *L)
 {
+	double t = lua_tonumber(L, -5);
 	double x1 = lua_tonumber(L, -4);
 	double y1 = lua_tonumber(L, -3);
 	double x2 = lua_tonumber(L, -2);
@@ -27,7 +28,7 @@ draw_line(lua_State *L)
 
 	cairo_move_to(cr, x1, y1);
 	cairo_line_to(cr, x2, y2);
-	cairo_set_line_width(cr, 1);
+	cairo_set_line_width(cr, t);
 	cairo_stroke(cr);
 
 	return 0;
@@ -36,23 +37,35 @@ draw_line(lua_State *L)
 int
 draw_glyph(lua_State *L)
 {
-	unsigned int glyph = lua_tonumber(L, -3);
+	unsigned int val = lua_tonumber(L, -3);
 	double x = lua_tonumber(L, -2);
 	double y = lua_tonumber(L, -1);
 
-	int index = FT_Get_Char_Index(face, glyph);
-	cairo_glyph_t treble_clef = {index, x, y};
-
-	cairo_text_extents_t extents;
-	cairo_glyph_extents(cr, &treble_clef, 1, &extents);
+	int index = FT_Get_Char_Index(face, val);
+	cairo_glyph_t glyph = {index, x, y};
 
 	cairo_set_font_face(cr, cface);
 	cairo_set_font_size(cr, 32.0);
 
 	cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
-	cairo_show_glyphs(cr, &treble_clef, 1);
+	cairo_show_glyphs(cr, &glyph, 1);
 
 	return 0;
+}
+
+int
+glyph_extents(lua_State *L)
+{
+	unsigned int val = lua_tonumber(L, -1);
+	cairo_text_extents_t extents;
+	int index = FT_Get_Char_Index(face, val);
+	cairo_glyph_t glyph = {index, 0, 0};
+	cairo_glyph_extents(cr, &glyph, 1, &extents);
+
+	lua_pushnumber(L, extents.width);
+	lua_pushnumber(L, extents.height);
+
+	return 2;
 }
 
 int
@@ -64,6 +77,8 @@ main(int argc, char *argv[])
 	lua_setglobal(L, "draw_glyph");
 	lua_pushcfunction(L, draw_line);
 	lua_setglobal(L, "draw_line");
+	lua_pushcfunction(L, glyph_extents);
+	lua_setglobal(L, "glyph_extents");
 	FT_Library library;
 	int error = FT_Init_FreeType(&library);
 
