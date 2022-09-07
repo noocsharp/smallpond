@@ -113,7 +113,7 @@ command_dispatch = {
 		else
 			error("oops")
 		end
-		time = time + data.count * 10
+		time = time + 100 / data.count
 	end,
 	changeclef = function(data)
 		if data.kind == "treble" then
