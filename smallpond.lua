@@ -87,6 +87,12 @@ function parse(text)
 			return {command="newnote", note=note, count=tonumber(count)}
 		end
 
+		local s, e = string.find(text, "^|", i)
+		if s then
+			i = i + e - s + 1
+			return {command="barline"}
+		end
+
 		error("unknown token")
 	end
 end
@@ -126,6 +132,9 @@ command_dispatch = {
 	end,
 	changetime = function(data)
 		table.insert(staff, {kind="time", x=x, y=em, num=data.num, denom=data.denom})
+	end,
+	barline = function(data)
+		table.insert(staff, {kind="barline"})
 	end
 }
 
@@ -148,6 +157,10 @@ for i, el in ipairs(staff) do
 		lasttime = el.time
 	elseif el.kind == "stem" then
 		draw_line(1, el.head.x + xoffset + 0.5, yoffset + el.head.y + .188*em, el.head.x + xoffset + 0.5, el.head.y + yoffset + 3.5*em)
+	elseif el.kind == "barline" then
+		x = x + 20
+		draw_line(1, x + xoffset, yoffset, x + xoffset, yoffset + 4*em)
+		x = x + 20
 	elseif el.kind == "clef" then
 		draw_glyph(el.class.glyph, xoffset + x, yoffset + el.y)
 		x = x + 30
