@@ -4,7 +4,8 @@ local em = 8
 local Glyph = {
 	["noteheadWhole"] = 0xE0A2,
 	["noteheadHalf"] = 0xE0A3,
-	["noteheadBlack"] = 0xE0A4
+	["noteheadBlack"] = 0xE0A4,
+	["flag8thDown"] = 0xE241,
 }
 
 local gClef = 0xE050
@@ -151,12 +152,12 @@ for i, el in ipairs(staff) do
 			glyph = Glyph["noteheadBlack"]
 		elseif el.length == 8 then
 			glyph = Glyph["noteheadBlack"]
+			table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=ry + 3.5*em})
 		end
 		table.insert(drawables, {kind="glyph", glyph=glyph, x=rx, y=ry})
 		if el.length > 1 then
 			table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .188*em, x2=rx + 0.5, y2=ry + 3.5*em})
 		end
-		print(el.time, x)
 		x = x + 100 / el.length
 		lasttime = el.time
 	elseif el.kind == "barline" then
