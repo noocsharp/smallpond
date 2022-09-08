@@ -100,38 +100,25 @@ end
 f = assert(io.open("score.sp"))
 
 local time = 0 -- time in increments of denom
+-- abstract placement
 staff = {}
-command_dispatch = {
+abstract_dispatch = {
 	newnote = function(data)
 		local i = staff.clef.place(data.note)
-		if data.count == 1 then
-			table.insert(staff, {kind="notehead", glyph="noteheadWhole", time=time, y=(em*i) / 2})
-		elseif data.count == 2 then
-			local head = {kind="notehead", glyph="noteheadHalf", time=time, y=(em*i) / 2}
-			table.insert(staff, head)
-			table.insert(staff, {kind="stem", head=head})
-		elseif data.count == 4 then
-			local head = {kind="notehead", glyph="noteheadBlack", time=time, y=(em*i) / 2}
-			table.insert(staff, head)
-			table.insert(staff, {kind="stem", head=head})
-		elseif data.count == 8 then
-			table.insert(staff, {kind="notehead", glyph="noteheadBlack", time=time, y=(em*i) / 2})
-		else
-			error("oops")
-		end
-		time = time + 100 / data.count
+		table.insert(staff, {kind="note", length=data.count, time=time, sy=i})
+		time = time + 1 / data.count
 	end,
 	changeclef = function(data)
 		if data.kind == "treble" then
 			staff.clef = treble
-			table.insert(staff, {kind="clef", class=treble, x=x, y=3*em})
+			table.insert(staff, {kind="clef", class=treble, yoff=3*em})
 		elseif data.kind == "bass" then
 			staff.clef = bass
-			table.insert(staff, {kind="clef", class=bass, x=x, y=em})
+			table.insert(staff, {kind="clef", class=bass, yoff=em})
 		end
 	end,
 	changetime = function(data)
-		table.insert(staff, {kind="time", x=x, y=em, num=data.num, denom=data.denom})
+		table.insert(staff, {kind="time", num=data.num, denom=data.denom})
 	end,
 	barline = function(data)
 		table.insert(staff, {kind="barline"})
@@ -139,36 +126,59 @@ command_dispatch = {
 }
 
 for tok in parse(f:read("*a")) do
-	local func = assert(command_dispatch[tok.command])
+	local func = assert(abstract_dispatch[tok.command])
 	func(tok)
 end
 
--- determine staff width, the +20 is a hack, should be determined from notehead width + some padding
+drawables = {}
+
+-- starting yoffset at 20 is a hack
 local yoffset = 20
 local xoffset = 20
 local x = 10
 local lasttime = 0
 
 for i, el in ipairs(staff) do
-	if el.kind == "notehead" then
-		draw_glyph(Glyph[el.glyph], xoffset + x, yoffset + el.y)
-		el.x = x
-		x = x + (el.time - lasttime)
+	if el.kind == "note" then
+		local rx = xoffset + x
+		local ry = yoffset + (em*el.sy) / 2
+		local glyph
+		if el.length == 1 then
+			glyph = Glyph["noteheadWhole"]
+		elseif el.length == 2 then
+			glyph = Glyph["noteheadHalf"]
+		elseif el.length == 4 then
+			glyph = Glyph["noteheadBlack"]
+		elseif el.length == 8 then
+			glyph = Glyph["noteheadBlack"]
+		end
+		table.insert(drawables, {kind="glyph", glyph=glyph, x=rx, y=ry})
+		if el.length > 1 then
+			table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .188*em, x2=rx + 0.5, y2=ry + 3.5*em})
+		end
+		print(el.time, x)
+		x = x + 100 / el.length
 		lasttime = el.time
-	elseif el.kind == "stem" then
-		draw_line(1, el.head.x + xoffset + 0.5, yoffset + el.head.y + .188*em, el.head.x + xoffset + 0.5, el.head.y + yoffset + 3.5*em)
 	elseif el.kind == "barline" then
 		x = x + 20
-		draw_line(1, x + xoffset, yoffset, x + xoffset, yoffset + 4*em)
+		table.insert(drawables, {kind="line", t=1, x1=x + xoffset, y1=yoffset, x2=x + xoffset, y2 = yoffset + 4*em})
 		x = x + 20
 	elseif el.kind == "clef" then
-		draw_glyph(el.class.glyph, xoffset + x, yoffset + el.y)
+		table.insert(drawables, {kind="glyph", glyph=el.class.glyph, x=xoffset + x, y=yoffset + el.yoff})
 		x = x + 30
 	elseif el.kind == "time" then
 		-- TODO: draw multidigit time signatures properly
-		draw_glyph(numerals[el.num], xoffset + x, yoffset + el.y)
-		draw_glyph(numerals[el.denom], xoffset + x, yoffset + el.y + 2*em)
+		table.insert(drawables, {kind="glyph", glyph=numerals[el.num], x=xoffset + x, y=yoffset + em})
+		table.insert(drawables, {kind="glyph", glyph=numerals[el.denom], x=xoffset + x, y=yoffset + 3*em})
 		x = x + 30
+	end
+end
+
+for i, d in ipairs(drawables) do
+	if d.kind == "glyph" then
+		draw_glyph(d.glyph, d.x, d.y)
+	elseif d.kind == "line" then
+		draw_line(d.t, d.x1, d.y1, d.x2, d.y2)
 	end
 end
 
