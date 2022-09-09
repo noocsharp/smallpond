@@ -22,7 +22,7 @@ local Clef = {
 			local defoctave = 4 -- TODO: how do we use the value above?
 			local NOTES = "abcdefg"
 			local s, _ = string.find(NOTES, char)
-			return (octave - defoctave) * 7 + 6 - s
+			return (octave - defoctave) * 7 + 2 - s
 		end
 	},
 	["bass"] = {
@@ -33,7 +33,7 @@ local Clef = {
 			local defoctave = 3 -- TODO: how do we use the value above?
 			local NOTES = "abcdefg"
 			local s, _ = string.find(NOTES, char)
-			return (octave - defoctave) * 7 + 8 - s
+			return (octave - defoctave) * 7 + 4 - s
 		end
 	}
 }
@@ -165,7 +165,7 @@ local lasttime = 0
 for i, el in ipairs(staff) do
 	if el.kind == "note" then
 		local rx = xoffset + x
-		local ry = yoffset + (em*el.sy) / 2
+		local ry = yoffset + (em*el.sy) / 2 + 2*em
 		if el.acc == "s" then
 			table.insert(drawables, {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
 		elseif el.acc == "f" then
@@ -190,14 +190,14 @@ for i, el in ipairs(staff) do
 
 		local w, h = glyph_extents(glyph)
 		-- leger lines
-		if el.sy <= -2 then
-			for j = -2, el.sy, -2 do
+		if el.sy <= -6 then
+			for j = -6, el.sy, -2 do
 				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * j) / 2, x2=rx + w + .2*em, y2=yoffset + (em * j) / 2})
 			end
 		end
 
-		if el.sy >= 10 then
-			for j = 10, el.sy, 2 do
+		if el.sy >= 6 then
+			for j = 6, el.sy, 2 do
 				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * j) / 2, x2=rx + w + .2*em, y2=yoffset + (em * j) / 2})
 			end
 		end
