@@ -10,6 +10,31 @@ local Glyph = {
 
 local gClef = 0xE050
 local fClef = 0xE062
+local Clef = {
+	["treble"] = {
+		glyph = gClef,
+		yoff = 3*em,
+		defoctave = 4,
+		place = function(char, octave)
+			local defoctave = 4 -- TODO: how do we use the value above?
+			local NOTES = "abcdefg"
+			local s, _ = string.find(NOTES, char)
+			return (octave - defoctave) * 7 + 6 - s
+		end
+	},
+	["bass"] = {
+		glyph = fClef,
+		yoff = em,
+		defoctave = 3,
+		place = function(char, octave)
+			local defoctave = 3 -- TODO: how do we use the value above?
+			local NOTES = "abcdefg"
+			local s, _ = string.find(NOTES, char)
+			return (octave - defoctave) * 7 + 8 - s
+		end
+	}
+}
+
 local numerals = {
 	['0'] = 0xE080,
 	['1'] = 0xE081,
@@ -21,26 +46,6 @@ local numerals = {
 	['7'] = 0xE087,
 	['8'] = 0xE088,
 	['9'] = 0xE089
-}
-
-local treble = {
-	glyph = gClef,
-	yoff = 3*em,
-	place = function(char)
-		local NOTES = "abcdefg"
-		local s, _ = string.find(NOTES, char)
-		return 6 - s
-	end
-}
-
-local bass = {
-	glyph = fClef,
-	yoff = em,
-	place = function(char)
-		local NOTES = "abcdefg"
-		local s, _ = string.find(NOTES, char)
-		return 8 - s
-	end
 }
 
 commands = {
@@ -85,13 +90,25 @@ function parse(text)
 		local s, e, note, count = string.find(text, "^([abcdefg])([1248]?)", i)
 		if note then
 			i = i + e - s + 1
-			return {command="newnote", note=note, count=tonumber(count)}
+			return {command="newnote", note=note, accidental=acc, count=tonumber(count)}
 		end
 
 		local s, e = string.find(text, "^|", i)
 		if s then
 			i = i + e - s + 1
 			return {command="barline"}
+		end
+
+		local s, e = string.find(text, "^'", i)
+		if s then
+			i = i + e - s + 1
+			return {command="changeoctave", count=-(e - s + 1)}
+		end
+
+		local s, e = string.find(text, "^,", i)
+		if s then
+			i = i + e - s + 1
+			return {command="changeoctave", count=e - s + 1}
 		end
 
 		error("unknown token")
@@ -101,28 +118,30 @@ end
 f = assert(io.open("score.sp"))
 
 local time = 0 -- time in increments of denom
+local octave = 0
+local clef = Clef.treble
 -- abstract placement
 staff = {}
 abstract_dispatch = {
 	newnote = function(data)
-		local i = staff.clef.place(data.note)
-		table.insert(staff, {kind="note", length=data.count, time=time, sy=i})
+		local i = clef.place(data.note, octave)
+		table.insert(staff, {kind="note", accidental=data.accidental, length=data.count, time=time, sy=i})
 		time = time + 1 / data.count
 	end,
 	changeclef = function(data)
-		if data.kind == "treble" then
-			staff.clef = treble
-			table.insert(staff, {kind="clef", class=treble, yoff=3*em})
-		elseif data.kind == "bass" then
-			staff.clef = bass
-			table.insert(staff, {kind="clef", class=bass, yoff=em})
-		end
+		local class = assert(Clef[data.kind])
+		table.insert(staff, {kind="clef", class=class})
+		clef = class
+		octave = class.defoctave
 	end,
 	changetime = function(data)
 		table.insert(staff, {kind="time", num=data.num, denom=data.denom})
 	end,
 	barline = function(data)
 		table.insert(staff, {kind="barline"})
+	end,
+	changeoctave = function(data)
+		octave = octave + data.count
 	end
 }
 
@@ -143,6 +162,8 @@ for i, el in ipairs(staff) do
 	if el.kind == "note" then
 		local rx = xoffset + x
 		local ry = yoffset + (em*el.sy) / 2
+
+
 		local glyph
 		if el.length == 1 then
 			glyph = Glyph["noteheadWhole"]
@@ -154,6 +175,21 @@ for i, el in ipairs(staff) do
 			glyph = Glyph["noteheadBlack"]
 			table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=ry + 3.5*em})
 		end
+
+		local w, h = glyph_extents(glyph)
+		-- leger lines
+		if el.sy <= -2 then
+			for j = -2, el.sy, -2 do
+				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * j) / 2, x2=rx + w + .2*em, y2=yoffset + (em * j) / 2})
+			end
+		end
+
+		if el.sy >= 10 then
+			for j = 10, el.sy, 2 do
+				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * j) / 2, x2=rx + w + .2*em, y2=yoffset + (em * j) / 2})
+			end
+		end
+
 		table.insert(drawables, {kind="glyph", glyph=glyph, x=rx, y=ry})
 		if el.length > 1 then
 			table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .188*em, x2=rx + 0.5, y2=ry + 3.5*em})
@@ -165,7 +201,7 @@ for i, el in ipairs(staff) do
 		table.insert(drawables, {kind="line", t=1, x1=x + xoffset, y1=yoffset, x2=x + xoffset, y2 = yoffset + 4*em})
 		x = x + 20
 	elseif el.kind == "clef" then
-		table.insert(drawables, {kind="glyph", glyph=el.class.glyph, x=xoffset + x, y=yoffset + el.yoff})
+		table.insert(drawables, {kind="glyph", glyph=el.class.glyph, x=xoffset + x, y=yoffset + el.class.yoff})
 		x = x + 30
 	elseif el.kind == "time" then
 		-- TODO: draw multidigit time signatures properly

@@ -57,9 +57,9 @@ int
 glyph_extents(lua_State *L)
 {
 	unsigned int val = lua_tonumber(L, -1);
-	cairo_text_extents_t extents;
-	int index = FT_Get_Char_Index(face, val);
+	unsigned int index = FT_Get_Char_Index(face, val);
 	cairo_glyph_t glyph = {index, 0, 0};
+	cairo_text_extents_t extents;
 	cairo_glyph_extents(cr, &glyph, 1, &extents);
 
 	lua_pushnumber(L, extents.width);
@@ -102,6 +102,9 @@ main(int argc, char *argv[])
 
 	cairo_surface_t *surface = cairo_pdf_surface_create("out.pdf", 648, 864);
 	cr = cairo_create(surface);
+
+	cairo_set_font_face(cr, cface);
+	cairo_set_font_size(cr, 32.0);
 
 	if (luaL_dofile(L, "smallpond.lua")) {
 		fprintf(stderr, "lua error: %s\n", lua_tostring(L, -1));
