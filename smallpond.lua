@@ -6,13 +6,16 @@ local Glyph = {
 	["noteheadHalf"] = 0xE0A3,
 	["noteheadBlack"] = 0xE0A4,
 	["flag8thDown"] = 0xE241,
+	["accidentalFlat"] = 0xE260,
+	["accidentalNatural"] = 0xE261,
+	["accidentalSharp"] = 0xE262,
+	["gClef"] = 0xE050,
+	["fClef"] = 0xE062,
 }
 
-local gClef = 0xE050
-local fClef = 0xE062
 local Clef = {
 	["treble"] = {
-		glyph = gClef,
+		glyph = Glyph.gClef,
 		yoff = 3*em,
 		defoctave = 4,
 		place = function(char, octave)
@@ -23,7 +26,7 @@ local Clef = {
 		end
 	},
 	["bass"] = {
-		glyph = fClef,
+		glyph = Glyph.fClef,
 		yoff = em,
 		defoctave = 3,
 		place = function(char, octave)
@@ -87,12 +90,6 @@ function parse(text)
 			return data
 		end
 
-		local s, e, note, count = string.find(text, "^([abcdefg])([1248]?)", i)
-		if note then
-			i = i + e - s + 1
-			return {command="newnote", note=note, accidental=acc, count=tonumber(count)}
-		end
-
 		local s, e = string.find(text, "^|", i)
 		if s then
 			i = i + e - s + 1
@@ -111,6 +108,13 @@ function parse(text)
 			return {command="changeoctave", count=e - s + 1}
 		end
 
+		local s, e, note, acc, count = string.find(text, "^([abcdefg])([fns]?)([1248]?)", i)
+		if note then
+			i = i + e - s + 1
+			return {command="newnote", note=note, acc=acc, count=tonumber(count)}
+		end
+
+
 		error("unknown token")
 	end
 end
@@ -125,7 +129,7 @@ staff = {}
 abstract_dispatch = {
 	newnote = function(data)
 		local i = clef.place(data.note, octave)
-		table.insert(staff, {kind="note", accidental=data.accidental, length=data.count, time=time, sy=i})
+		table.insert(staff, {kind="note", acc=data.acc, length=data.count, time=time, sy=i})
 		time = time + 1 / data.count
 	end,
 	changeclef = function(data)
@@ -162,7 +166,15 @@ for i, el in ipairs(staff) do
 	if el.kind == "note" then
 		local rx = xoffset + x
 		local ry = yoffset + (em*el.sy) / 2
+		if el.acc == "s" then
+			table.insert(drawables, {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
+		elseif el.acc == "f" then
+			table.insert(drawables, {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry})
+		elseif el.acc == "n" then
+			table.insert(drawables, {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
+		end
 
+		rx = rx + 10
 
 		local glyph
 		if el.length == 1 then
@@ -194,7 +206,7 @@ for i, el in ipairs(staff) do
 		if el.length > 1 then
 			table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .188*em, x2=rx + 0.5, y2=ry + 3.5*em})
 		end
-		x = x + 100 / el.length
+		x = x + 100 / el.length + 10
 		lasttime = el.time
 	elseif el.kind == "barline" then
 		x = x + 20
