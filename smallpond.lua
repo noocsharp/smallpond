@@ -6,6 +6,7 @@ local Glyph = {
 	["noteheadHalf"] = 0xE0A3,
 	["noteheadBlack"] = 0xE0A4,
 	["flag8thDown"] = 0xE241,
+	["flag8thUp"] = 0xE240,
 	["accidentalFlat"] = 0xE260,
 	["accidentalNatural"] = 0xE261,
 	["accidentalSharp"] = 0xE262,
@@ -185,7 +186,6 @@ for i, el in ipairs(staff) do
 			glyph = Glyph["noteheadBlack"]
 		elseif el.length == 8 then
 			glyph = Glyph["noteheadBlack"]
-			table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=ry + 3.5*em})
 		end
 
 		local w, h = glyph_extents(glyph)
@@ -203,8 +203,25 @@ for i, el in ipairs(staff) do
 		end
 
 		table.insert(drawables, {kind="glyph", glyph=glyph, x=rx, y=ry})
+
+		-- stem
 		if el.length > 1 then
-			table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .188*em, x2=rx + 0.5, y2=ry + 3.5*em})
+			if el.sy <= 0 then
+				table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .168*em, x2=rx + 0.5, y2=ry + 3.5*em})
+			else
+				table.insert(drawables, {kind="line", t=1, x1=w + rx - .5, y1=ry - .168*em, x2=w + rx - .5, y2=ry -.168*em - 3.5*em})
+			end
+		end
+
+		if el.length == 8 then
+			if el.sy <= 0 then
+				table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=ry + 3.5*em})
+			else
+				-- TODO: move glyph extents to a precalculated table or something
+				local fx, fy = glyph_extents(Glyph["flag8thUp"])
+				table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thUp"], x=w + rx - 1, y=ry -.168*em - 3.5*em})
+				x = x + fx
+			end
 		end
 		x = x + 100 / el.length + 10
 		lasttime = el.time
