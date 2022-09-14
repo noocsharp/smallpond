@@ -109,10 +109,16 @@ function parse(text)
 			return {command="changeoctave", count=e - s + 1}
 		end
 
-		local s, e, note, acc, count = string.find(text, "^([abcdefg])([fns]?)([1248]?)", i)
+		local s, e, note, acc, flags, count = string.find(text, "^([abcdefg])([fns]?)([v^]?)([1248]?)", i)
 		if note then
 			i = i + e - s + 1
-			return {command="newnote", note=note, acc=acc, count=tonumber(count)}
+			local out = {command="newnote", note=note, acc=acc, count=tonumber(count)}
+			if string.find(flags, "v", 1, true) then
+				out.stemdir = 1
+			elseif string.find(flags, "^", 1, true) then
+				out.stemdir = -1
+			end
+			return out
 		end
 
 
@@ -130,7 +136,7 @@ staff = {}
 abstract_dispatch = {
 	newnote = function(data)
 		local i = clef.place(data.note, octave)
-		table.insert(staff, {kind="note", acc=data.acc, length=data.count, time=time, sy=i})
+		table.insert(staff, {kind="note", acc=data.acc, stemdir=data.stemdir, length=data.count, time=time, sy=i})
 		time = time + 1 / data.count
 	end,
 	changeclef = function(data)
@@ -204,17 +210,26 @@ for i, el in ipairs(staff) do
 
 		table.insert(drawables, {kind="glyph", glyph=glyph, x=rx, y=ry})
 
-		-- stem
-		if el.length > 1 then
+		if not el.stemdir and el.length > 1 then
 			if el.sy <= 0 then
-				table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .168*em, x2=rx + 0.5, y2=ry + 3.5*em})
+				el.stemdir = -1
 			else
+				el.stemdir = 1
+			end
+		end
+
+		-- stem
+		if el.stemdir then
+			if el.stemdir == -1 then
+				-- stem up
 				table.insert(drawables, {kind="line", t=1, x1=w + rx - .5, y1=ry - .168*em, x2=w + rx - .5, y2=ry -.168*em - 3.5*em})
+			else
+				table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .168*em, x2=rx + 0.5, y2=ry + 3.5*em})
 			end
 		end
 
 		if el.length == 8 then
-			if el.sy <= 0 then
+			if el.stemdir == 1 then
 				table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=ry + 3.5*em})
 			else
 				-- TODO: move glyph extents to a precalculated table or something
