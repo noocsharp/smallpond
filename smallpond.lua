@@ -306,17 +306,103 @@ for i, el in ipairs(staff) do
 	end
 end
 
+-- calculate extents
+local xmin = 0
+local ymin = 0
+local xmax = 0
+local ymax = 0
 for i, d in ipairs(drawables) do
 	if d.kind == "glyph" then
-		draw_glyph(d.glyph, d.x, d.y)
+		-- TODO
+		local w, h = glyph_extents(glyph)
 	elseif d.kind == "line" then
-		draw_line(d.t, d.x1, d.y1, d.x2, d.y2)
+		if d.x1 < xmin then
+			xmin = d.x1
+		elseif d.x1 > xmax then
+			xmax = d.x1
+		end
+
+		if d.x2 < xmin then
+			xmin = d.x2
+		elseif d.x2 > xmax then
+			xmax = d.x2
+		end
+
+		if d.y1 < ymin then
+			ymin = d.y1
+		elseif d.y1 > ymax then
+			ymax = d.y1
+		end
+
+		if d.y2 < ymin then
+			ymin = d.y2
+		elseif d.y2 > ymax then
+			ymax = d.y2
+		end
 	elseif d.kind == "quad" then
-		draw_quad(d.t, d.x1, d.y1, d.x2, d.y2, d.x3, d.y3, d.x4, d.y4)
+		if d.x1 < xmin then
+			xmin = d.x1
+		elseif d.x1 > xmax then
+			xmax = d.x1
+		end
+
+		if d.x2 < xmin then
+			xmin = d.x2
+		elseif d.x2 > xmax then
+			xmax = d.x2
+		end
+
+		if d.y1 < ymin then
+			ymin = d.y1
+		elseif d.y1 > ymax then
+			ymax = d.y1
+		end
+
+		if d.y2 < ymin then
+			ymin = d.y2
+		elseif d.y2 > ymax then
+			ymax = d.y2
+		end
+
+		if d.x3 < xmin then
+			xmin = d.x3
+		elseif d.x3 > xmax then
+			xmax = d.x3
+		end
+
+		if d.x4 < xmin then
+			xmin = d.x4
+		elseif d.x4 > xmax then
+			xmax = d.x4
+		end
+
+		if d.y3 < ymin then
+			ymin = d.y3
+		elseif d.y3 > ymax then
+			ymax = d.y3
+		end
+
+		if d.y4 < ymin then
+			ymin = d.y4
+		elseif d.y4 > ymax then
+			ymax = d.y4
+		end
+	end
+end
+
+create_surface(xmax - xmin, ymax - ymin)
+
+for i, d in ipairs(drawables) do
+	if d.kind == "glyph" then
+		draw_glyph(d.glyph, d.x - xmin, d.y - ymin)
+	elseif d.kind == "line" then
+		draw_line(d.t, d.x1 - xmin, d.y1 - ymin, d.x2 - xmin, d.y2 - ymin)
+	elseif d.kind == "quad" then
+		draw_quad(d.t, d.x1 - xmin, d.y1 - ymin, d.x2 - xmin, d.y2 - ymin, d.x3 - xmin, d.y3 - ymin, d.x4 - xmin, d.y4 - ymin)
 	end
 end
 
 -- draw staff
 for y=0,em*4,em do
-	draw_line(1, xoffset, y + yoffset, x + xoffset, y + yoffset)
+	draw_line(1, xoffset - xmin, y + yoffset - ymin, x + xoffset - xmin, y + yoffset - ymin)
 end

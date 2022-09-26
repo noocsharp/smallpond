@@ -14,6 +14,7 @@
 cairo_t *cr;
 FT_Face face;
 cairo_font_face_t *cface;
+cairo_surface_t *surface;
 
 int
 draw_line(lua_State *L)
@@ -92,10 +93,30 @@ glyph_extents(lua_State *L)
 }
 
 int
+create_surface(lua_State *L)
+{
+	double width = lua_tonumber(L, -2);
+	double height = lua_tonumber(L, -1);
+
+	cairo_destroy(cr);
+	cairo_surface_destroy(surface);
+
+	surface = cairo_pdf_surface_create("out.pdf", width, height);
+	cr = cairo_create(surface);
+
+	cairo_set_font_face(cr, cface);
+	cairo_set_font_size(cr, 32.0);
+
+	return 0;
+}
+
+int
 main(int argc, char *argv[])
 {
 	lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
+	lua_pushcfunction(L, create_surface);
+	lua_setglobal(L, "create_surface");
 	lua_pushcfunction(L, draw_glyph);
 	lua_setglobal(L, "draw_glyph");
 	lua_pushcfunction(L, draw_line);
@@ -125,12 +146,11 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	cairo_surface_t *surface = cairo_pdf_surface_create("out.pdf", 648, 864);
+	surface = cairo_image_surface_create (CAIRO_FORMAT_A8, 1, 1);
 	cr = cairo_create(surface);
 
 	cairo_set_font_face(cr, cface);
 	cairo_set_font_size(cr, 32.0);
-
 	if (luaL_dofile(L, "smallpond.lua")) {
 		fprintf(stderr, "lua error: %s\n", lua_tostring(L, -1));
 		return 1;
