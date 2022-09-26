@@ -131,25 +131,34 @@ f = assert(io.open("score.sp"))
 local time = 0 -- time in increments of denom
 local octave = 0
 local clef = Clef.treble
--- abstract placement
-staff = {}
+local lastnote = nil
+-- first-order placement
+first_order = {}
 abstract_dispatch = {
 	newnote = function(data)
 		local i = clef.place(data.note, octave)
-		table.insert(staff, {kind="note", acc=data.acc, stemdir=data.stemdir, length=data.count, time=time, sy=i})
+		local beamed = false
+		if data.count == 8 and (time % .25 == 0 or lastnote.beamed) then
+			beamed = true
+			-- TODO: should we be emitting a beam here?
+		end
+		local note = {kind="note", acc=data.acc, beamed=beamed, stemdir=data.stemdir, stemlen=3.5, length=data.count, time=time, sy=i}
+		table.insert(first_order, note)
+		lastnote = note
 		time = time + 1 / data.count
 	end,
 	changeclef = function(data)
 		local class = assert(Clef[data.kind])
-		table.insert(staff, {kind="clef", class=class})
+		table.insert(first_order, {kind="clef", class=class})
 		clef = class
 		octave = class.defoctave
 	end,
 	changetime = function(data)
-		table.insert(staff, {kind="time", num=data.num, denom=data.denom})
+		table.insert(first_order, {kind="time", num=data.num, denom=data.denom})
 	end,
 	barline = function(data)
-		table.insert(staff, {kind="barline"})
+		table.insert(first_order, {kind="barline"})
+		lastnote = nil
 	end,
 	changeoctave = function(data)
 		octave = octave + data.count
@@ -157,8 +166,44 @@ abstract_dispatch = {
 }
 
 for tok in parse(f:read("*a")) do
-	local func = assert(abstract_dispatch[tok.command])
-	func(tok)
+	assert(abstract_dispatch[tok.command])(tok)
+end
+
+-- second-order placement
+local staff = {}
+local tobeam = {}
+
+for i, el in ipairs(first_order) do
+	if el.kind == 'note' and el.beamed then
+		tobeam[#tobeam + 1] = el
+	else
+		if #tobeam > 1 then
+			-- check which way the stem should point on all the notes in the beam
+			local ysum = 0
+			for _, note in ipairs(tobeam) do
+				ysum = ysum + note.sy
+			end
+
+			local stemdir
+			if ysum >= 0 then
+				stemdir = -1
+			else
+				stemdir = 1
+			end
+
+			-- update the stem direction
+			for _, note in ipairs(tobeam) do
+				note.stemdir = stemdir
+				table.insert(staff, note)
+			end
+			table.insert(staff, {kind='beam', first=tobeam[1], last=tobeam[#tobeam]})
+		elseif #tobeam == 1 then
+			tobeam[1].beamed = false
+			table.insert(staff, tobeam[1])
+		end
+		tobeam = {}
+		table.insert(staff, el)
+	end
 end
 
 drawables = {}
@@ -222,13 +267,17 @@ for i, el in ipairs(staff) do
 		if el.stemdir then
 			if el.stemdir == -1 then
 				-- stem up
-				table.insert(drawables, {kind="line", t=1, x1=w + rx - .5, y1=ry - .168*em, x2=w + rx - .5, y2=ry -.168*em - 3.5*em})
+				el.stemx = w + rx - .5
+				el.stemy = ry -.168*em - el.stemlen*em
+				table.insert(drawables, {kind="line", t=1, x1=w + rx - .5, y1=ry - .168*em, x2=w + rx - .5, y2=ry -.168*em - el.stemlen*em})
 			else
-				table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .168*em, x2=rx + 0.5, y2=ry + 3.5*em})
+				el.stemx = rx - .5
+				el.stemy = ry + el.stemlen*em
+				table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .168*em, x2=rx + 0.5, y2=ry + el.stemlen*em})
 			end
 		end
 
-		if el.length == 8 then
+		if el.length == 8 and not el.beamed then
 			if el.stemdir == 1 then
 				table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=ry + 3.5*em})
 			else
@@ -240,6 +289,8 @@ for i, el in ipairs(staff) do
 		end
 		x = x + 100 / el.length + 10
 		lasttime = el.time
+	elseif el.kind == "beam" then
+				table.insert(drawables, {kind="quad", x1=el.first.stemx - 0.5, y1=el.first.stemy, x2=el.last.stemx, y2=el.last.stemy, x4=el.first.stemx - 0.5, y4=el.first.stemy + 5, x3=el.last.stemx, y3=el.last.stemy + 5})
 	elseif el.kind == "barline" then
 		x = x + 20
 		table.insert(drawables, {kind="line", t=1, x1=x + xoffset, y1=yoffset, x2=x + xoffset, y2 = yoffset + 4*em})
@@ -260,6 +311,8 @@ for i, d in ipairs(drawables) do
 		draw_glyph(d.glyph, d.x, d.y)
 	elseif d.kind == "line" then
 		draw_line(d.t, d.x1, d.y1, d.x2, d.y2)
+	elseif d.kind == "quad" then
+		draw_quad(d.t, d.x1, d.y1, d.x2, d.y2, d.x3, d.y3, d.x4, d.y4)
 	end
 end
 

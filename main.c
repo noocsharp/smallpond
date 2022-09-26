@@ -35,6 +35,29 @@ draw_line(lua_State *L)
 }
 
 int
+draw_quad(lua_State *L)
+{
+	double x1 = lua_tonumber(L, -8);
+	double y1 = lua_tonumber(L, -7);
+	double x2 = lua_tonumber(L, -6);
+	double y2 = lua_tonumber(L, -5);
+	double x3 = lua_tonumber(L, -4);
+	double y3 = lua_tonumber(L, -3);
+	double x4 = lua_tonumber(L, -2);
+	double y4 = lua_tonumber(L, -1);
+
+	cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
+
+	cairo_move_to(cr, x1, y1);
+	cairo_line_to(cr, x2, y2);
+	cairo_line_to(cr, x3, y3);
+	cairo_line_to(cr, x4, y4);
+	cairo_fill(cr);
+
+	return 0;
+}
+
+int
 draw_glyph(lua_State *L)
 {
 	unsigned int val = lua_tonumber(L, -3);
@@ -77,6 +100,8 @@ main(int argc, char *argv[])
 	lua_setglobal(L, "draw_glyph");
 	lua_pushcfunction(L, draw_line);
 	lua_setglobal(L, "draw_line");
+	lua_pushcfunction(L, draw_quad);
+	lua_setglobal(L, "draw_quad");
 	lua_pushcfunction(L, glyph_extents);
 	lua_setglobal(L, "glyph_extents");
 	FT_Library library;
