@@ -267,13 +267,14 @@ for i, el in ipairs(staff) do
 		if el.stemdir then
 			if el.stemdir == -1 then
 				-- stem up
-				el.stemx = w + rx - .5
+				-- advance width for bravura is 1.18 - .1 for stem width
+				el.stemx = w + rx - 1.08
 				el.stemy = ry -.168*em - el.stemlen*em
-				table.insert(drawables, {kind="line", t=1, x1=w + rx - .5, y1=ry - .168*em, x2=w + rx - .5, y2=ry -.168*em - el.stemlen*em})
+				table.insert(drawables, {kind="line", t=1, x1=el.stemx, y1=ry - .168*em, x2=el.stemx, y2=ry -.168*em - el.stemlen*em})
 			else
-				el.stemx = rx - .5
+				el.stemx = rx + .5
 				el.stemy = ry + el.stemlen*em
-				table.insert(drawables, {kind="line", t=1, x1=rx + 0.5, y1=ry + .168*em, x2=rx + 0.5, y2=ry + el.stemlen*em})
+				table.insert(drawables, {kind="line", t=1, x1=el.stemx, y1=ry + .168*em, x2=el.stemx, y2=ry + el.stemlen*em})
 			end
 		end
 
@@ -283,7 +284,7 @@ for i, el in ipairs(staff) do
 			else
 				-- TODO: move glyph extents to a precalculated table or something
 				local fx, fy = glyph_extents(Glyph["flag8thUp"])
-				table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thUp"], x=w + rx - 1, y=ry -.168*em - 3.5*em})
+				table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=ry -.168*em - 3.5*em})
 				x = x + fx
 			end
 		end
