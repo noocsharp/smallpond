@@ -243,13 +243,13 @@ for i, el in ipairs(staff) do
 		-- leger lines
 		if el.sy <= -6 then
 			for j = -6, el.sy, -2 do
-				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * j) / 2, x2=rx + w + .2*em, y2=yoffset + (em * j) / 2})
+				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * (j + 4)) / 2, x2=rx + w + .2*em, y2=yoffset + (em * (j + 4)) / 2})
 			end
 		end
 
 		if el.sy >= 6 then
 			for j = 6, el.sy, 2 do
-				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * j) / 2, x2=rx + w + .2*em, y2=yoffset + (em * j) / 2})
+				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * (j + 4)) / 2, x2=rx + w + .2*em, y2=yoffset + (em * (j + 4)) / 2})
 			end
 		end
 
