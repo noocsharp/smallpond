@@ -161,6 +161,7 @@ function parse(text)
 end
 
 f = assert(io.open("score.sp"))
+parse(f:read("*a"))
 
 local time = 0 -- time in increments of denom
 local octave = 0
@@ -206,52 +207,55 @@ abstract_dispatch = {
 	end
 }
 
-parse(f:read("*a"))
-
 for _, voice in ipairs(voices) do
 	for _, item in ipairs(voice) do
 		assert(abstract_dispatch[item.command])(item)
 	end
 end
 
+first_order = nil
+
 -- second-order placement
-local staff = {}
+local staff2 = {}
 local tobeam = {}
 
-for i, el in ipairs(first_order) do
-	if el.kind == 'note' and el.beamed then
-		tobeam[#tobeam + 1] = el
-	else
-		if #tobeam > 1 then
-			-- check which way the stem should point on all the notes in the beam
-			local ysum = 0
-			for _, note in ipairs(tobeam) do
-				ysum = ysum + note.sy
-			end
+for staff, _ in pairs(staff1) do
+	staff2[staff] = {}
+	for i, el in ipairs(staff1[staff]) do
+		if el.kind == 'note' and el.beamed then
+			tobeam[#tobeam + 1] = el
+		else
+			if #tobeam > 1 then
+				-- check which way the stem should point on all the notes in the beam
+				local ysum = 0
+				for _, note in ipairs(tobeam) do
+					ysum = ysum + note.sy
+				end
 
-			local stemdir
-			if ysum >= 0 then
-				stemdir = -1
-			else
-				stemdir = 1
-			end
+				local stemdir
+				if ysum >= 0 then
+					stemdir = -1
+				else
+					stemdir = 1
+				end
 
-			-- update the stem direction
-			for _, note in ipairs(tobeam) do
-				note.stemdir = stemdir
-				table.insert(staff, note)
+				-- update the stem direction
+				for _, note in ipairs(tobeam) do
+					note.stemdir = stemdir
+					table.insert(staff2[staff], note)
+				end
+				table.insert(staff2[staff], {kind='beam', first=tobeam[1], last=tobeam[#tobeam]})
+			elseif #tobeam == 1 then
+				tobeam[1].beamed = false
+				table.insert(staff2[staff], tobeam[1])
 			end
-			table.insert(staff, {kind='beam', first=tobeam[1], last=tobeam[#tobeam]})
-		elseif #tobeam == 1 then
-			tobeam[1].beamed = false
-			table.insert(staff, tobeam[1])
+			tobeam = {}
+			table.insert(staff2[staff], el)
 		end
-		tobeam = {}
-		table.insert(staff, el)
 	end
 end
 
-drawables = {}
+local staff3 = {}
 
 -- starting yoffset at 20 is a hack
 local yoffset = 20
@@ -259,196 +263,217 @@ local xoffset = 20
 local x = 10
 local lasttime = 0
 
-for i, el in ipairs(staff) do
-	if el.kind == "note" then
-		local rx = xoffset + x
-		local ry = yoffset + (em*el.sy) / 2 + 2*em
-		if el.acc == "s" then
-			table.insert(drawables, {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
-		elseif el.acc == "f" then
-			table.insert(drawables, {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry})
-		elseif el.acc == "n" then
-			table.insert(drawables, {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
-		end
-
-		rx = rx + 10
-
-		local glyph
-		if el.length == 1 then
-			glyph = Glyph["noteheadWhole"]
-		elseif el.length == 2 then
-			glyph = Glyph["noteheadHalf"]
-		elseif el.length == 4 then
-			glyph = Glyph["noteheadBlack"]
-		elseif el.length == 8 then
-			glyph = Glyph["noteheadBlack"]
-		end
-
-		local w, h = glyph_extents(glyph)
-		-- leger lines
-		if el.sy <= -6 then
-			for j = -6, el.sy, -2 do
-				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * (j + 4)) / 2, x2=rx + w + .2*em, y2=yoffset + (em * (j + 4)) / 2})
+for staff, _ in pairs(staff2) do
+	staff3[staff] = {}
+	for i, el in ipairs(staff2[staff]) do
+		if el.kind == "note" then
+			local rx = xoffset + x
+			local ry = yoffset + (em*el.sy) / 2 + 2*em
+			if el.acc == "s" then
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
+			elseif el.acc == "f" then
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry})
+			elseif el.acc == "n" then
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
 			end
-		end
 
-		if el.sy >= 6 then
-			for j = 6, el.sy, 2 do
-				table.insert(drawables, {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * (j + 4)) / 2, x2=rx + w + .2*em, y2=yoffset + (em * (j + 4)) / 2})
+			rx = rx + 10
+
+			local glyph
+			if el.length == 1 then
+				glyph = Glyph["noteheadWhole"]
+			elseif el.length == 2 then
+				glyph = Glyph["noteheadHalf"]
+			elseif el.length == 4 then
+				glyph = Glyph["noteheadBlack"]
+			elseif el.length == 8 then
+				glyph = Glyph["noteheadBlack"]
 			end
-		end
 
-		table.insert(drawables, {kind="glyph", glyph=glyph, x=rx, y=ry})
-
-		if not el.stemdir and el.length > 1 then
-			if el.sy <= 0 then
-				el.stemdir = -1
-			else
-				el.stemdir = 1
+			local w, h = glyph_extents(glyph)
+			-- leger lines
+			if el.sy <= -6 then
+				for j = -6, el.sy, -2 do
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * (j + 4)) / 2, x2=rx + w + .2*em, y2=yoffset + (em * (j + 4)) / 2})
+				end
 			end
-		end
 
-		-- stem
-		if el.stemdir then
-			if el.stemdir == -1 then
-				-- stem up
-				-- advance width for bravura is 1.18 - .1 for stem width
-				el.stemx = w + rx - 1.08
-				el.stemy = ry -.168*em - el.stemlen*em
-				table.insert(drawables, {kind="line", t=1, x1=el.stemx, y1=ry - .168*em, x2=el.stemx, y2=ry -.168*em - el.stemlen*em})
-			else
-				el.stemx = rx + .5
-				el.stemy = ry + el.stemlen*em
-				table.insert(drawables, {kind="line", t=1, x1=el.stemx, y1=ry + .168*em, x2=el.stemx, y2=ry + el.stemlen*em})
+			if el.sy >= 6 then
+				for j = 6, el.sy, 2 do
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * (j + 4)) / 2, x2=rx + w + .2*em, y2=yoffset + (em * (j + 4)) / 2})
+				end
 			end
-		end
 
-		if el.length == 8 and not el.beamed then
-			if el.stemdir == 1 then
-				table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=ry + 3.5*em})
-			else
-				-- TODO: move glyph extents to a precalculated table or something
-				local fx, fy = glyph_extents(Glyph["flag8thUp"])
-				table.insert(drawables, {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=ry -.168*em - 3.5*em})
-				x = x + fx
+			table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=rx, y=ry})
+
+			if not el.stemdir and el.length > 1 then
+				if el.sy <= 0 then
+					el.stemdir = -1
+				else
+					el.stemdir = 1
+				end
 			end
+
+			-- stem
+			if el.stemdir then
+				if el.stemdir == -1 then
+					-- stem up
+					-- advance width for bravura is 1.18 - .1 for stem width
+					el.stemx = w + rx - 1.08
+					el.stemy = ry -.168*em - el.stemlen*em
+					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=ry - .168*em, x2=el.stemx, y2=ry -.168*em - el.stemlen*em})
+				else
+					el.stemx = rx + .5
+					el.stemy = ry + el.stemlen*em
+					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=ry + .168*em, x2=el.stemx, y2=ry + el.stemlen*em})
+				end
+			end
+
+			if el.length == 8 and not el.beamed then
+				if el.stemdir == 1 then
+					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=ry + 3.5*em})
+				else
+					-- TODO: move glyph extents to a precalculated table or something
+					local fx, fy = glyph_extents(Glyph["flag8thUp"])
+					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=ry -.168*em - 3.5*em})
+					x = x + fx
+				end
+			end
+			x = x + 100 / el.length + 10
+			lasttime = el.time
+		elseif el.kind == "beam" then
+					table.insert(staff3[staff], {kind="quad", x1=el.first.stemx - 0.5, y1=el.first.stemy, x2=el.last.stemx, y2=el.last.stemy, x4=el.first.stemx - 0.5, y4=el.first.stemy + 5, x3=el.last.stemx, y3=el.last.stemy + 5})
+		elseif el.kind == "barline" then
+			x = x + 20
+			table.insert(staff3[staff], {kind="line", t=1, x1=x + xoffset, y1=yoffset, x2=x + xoffset, y2 = yoffset + 4*em})
+			x = x + 20
+		elseif el.kind == "clef" then
+			table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=xoffset + x, y=yoffset + el.class.yoff})
+			x = x + 30
+		elseif el.kind == "time" then
+			-- TODO: draw multidigit time signatures properly
+			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=xoffset + x, y=yoffset + em})
+			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=xoffset + x, y=yoffset + 3*em})
+			x = x + 30
 		end
-		x = x + 100 / el.length + 10
-		lasttime = el.time
-	elseif el.kind == "beam" then
-				table.insert(drawables, {kind="quad", x1=el.first.stemx - 0.5, y1=el.first.stemy, x2=el.last.stemx, y2=el.last.stemy, x4=el.first.stemx - 0.5, y4=el.first.stemy + 5, x3=el.last.stemx, y3=el.last.stemy + 5})
-	elseif el.kind == "barline" then
-		x = x + 20
-		table.insert(drawables, {kind="line", t=1, x1=x + xoffset, y1=yoffset, x2=x + xoffset, y2 = yoffset + 4*em})
-		x = x + 20
-	elseif el.kind == "clef" then
-		table.insert(drawables, {kind="glyph", glyph=el.class.glyph, x=xoffset + x, y=yoffset + el.class.yoff})
-		x = x + 30
-	elseif el.kind == "time" then
-		-- TODO: draw multidigit time signatures properly
-		table.insert(drawables, {kind="glyph", glyph=numerals[el.num], x=xoffset + x, y=yoffset + em})
-		table.insert(drawables, {kind="glyph", glyph=numerals[el.denom], x=xoffset + x, y=yoffset + 3*em})
-		x = x + 30
 	end
 end
 
 -- calculate extents
-local xmin = 0
-local ymin = 0
+local extents = {}
+
+for staff, items in pairs(staff3) do
+	extents[staff] = {xmin=0, ymin=0, xmax=0, ymax=0}
+	for i, d in ipairs(items) do
+		if d.kind == "glyph" then
+			-- TODO
+			local w, h = glyph_extents(glyph)
+		elseif d.kind == "line" then
+			if d.x1 < extents[staff].xmin then
+				extents[staff].xmin = d.x1
+			elseif d.x1 > extents[staff].xmax then
+				extents[staff].xmax = d.x1
+			end
+
+			if d.x2 < extents[staff].xmin then
+				extents[staff].xmin = d.x2
+			elseif d.x2 > extents[staff].xmax then
+				extents[staff].xmax = d.x2
+			end
+
+			if d.y1 < extents[staff].ymin then
+				extents[staff].ymin = d.y1
+			elseif d.y1 > extents[staff].ymax then
+				extents[staff].ymax = d.y1
+			end
+
+			if d.y2 < extents[staff].ymin then
+				extents[staff].ymin = d.y2
+			elseif d.y2 > extents[staff].ymax then
+				extents[staff].ymax = d.y2
+			end
+		elseif d.kind == "quad" then
+			if d.x1 < extents[staff].xmin then
+				extents[staff].xmin = d.x1
+			elseif d.x1 > extents[staff].xmax then
+				extents[staff].xmax = d.x1
+			end
+
+			if d.x2 < extents[staff].xmin then
+				extents[staff].xmin = d.x2
+			elseif d.x2 > extents[staff].xmax then
+				extents[staff].xmax = d.x2
+			end
+
+			if d.y1 < extents[staff].ymin then
+				extents[staff].ymin = d.y1
+			elseif d.y1 > extents[staff].ymax then
+				extents[staff].ymax = d.y1
+			end
+
+			if d.y2 < extents[staff].ymin then
+				extents[staff].ymin = d.y2
+			elseif d.y2 > extents[staff].ymax then
+				extents[staff].ymax = d.y2
+			end
+
+			if d.x3 < extents[staff].xmin then
+				extents[staff].xmin = d.x3
+			elseif d.x3 > extents[staff].xmax then
+				extents[staff].xmax = d.x3
+			end
+
+			if d.x4 < extents[staff].xmin then
+				extents[staff].xmin = d.x4
+			elseif d.x4 > extents[staff].xmax then
+				extents[staff].xmax = d.x4
+			end
+
+			if d.y3 < extents[staff].ymin then
+				extents[staff].ymin = d.y3
+			elseif d.y3 > extents[staff].ymax then
+				extents[staff].ymax = d.y3
+			end
+
+			if d.y4 < extents[staff].ymin then
+				extents[staff].ymin = d.y4
+			elseif d.y4 > extents[staff].ymax then
+				extents[staff].ymax = d.y4
+			end
+		end
+	end
+end
+
 local xmax = 0
-local ymax = 0
-for i, d in ipairs(drawables) do
-	if d.kind == "glyph" then
-		-- TODO
-		local w, h = glyph_extents(glyph)
-	elseif d.kind == "line" then
-		if d.x1 < xmin then
-			xmin = d.x1
-		elseif d.x1 > xmax then
-			xmax = d.x1
-		end
+local yoff = 0
+local xmin = 0
+for staff, extent in pairs(extents) do
+	if xmin > extent.xmin then
+		xmin = extent.xmin
+	end
 
-		if d.x2 < xmin then
-			xmin = d.x2
-		elseif d.x2 > xmax then
-			xmax = d.x2
-		end
+	if xmax < extent.xmax then
+		xmax = extent.xmax
+	end
 
-		if d.y1 < ymin then
-			ymin = d.y1
-		elseif d.y1 > ymax then
-			ymax = d.y1
-		end
+	extent.yoff = yoff
+	yoff = yoff + extent.ymax - extent.ymin
+end
+create_surface(xmax - xmin, yoff)
 
-		if d.y2 < ymin then
-			ymin = d.y2
-		elseif d.y2 > ymax then
-			ymax = d.y2
-		end
-	elseif d.kind == "quad" then
-		if d.x1 < xmin then
-			xmin = d.x1
-		elseif d.x1 > xmax then
-			xmax = d.x1
-		end
-
-		if d.x2 < xmin then
-			xmin = d.x2
-		elseif d.x2 > xmax then
-			xmax = d.x2
-		end
-
-		if d.y1 < ymin then
-			ymin = d.y1
-		elseif d.y1 > ymax then
-			ymax = d.y1
-		end
-
-		if d.y2 < ymin then
-			ymin = d.y2
-		elseif d.y2 > ymax then
-			ymax = d.y2
-		end
-
-		if d.x3 < xmin then
-			xmin = d.x3
-		elseif d.x3 > xmax then
-			xmax = d.x3
-		end
-
-		if d.x4 < xmin then
-			xmin = d.x4
-		elseif d.x4 > xmax then
-			xmax = d.x4
-		end
-
-		if d.y3 < ymin then
-			ymin = d.y3
-		elseif d.y3 > ymax then
-			ymax = d.y3
-		end
-
-		if d.y4 < ymin then
-			ymin = d.y4
-		elseif d.y4 > ymax then
-			ymax = d.y4
+for staff, extent in pairs(extents) do
+	for i, d in ipairs(staff3[staff]) do
+		if d.kind == "glyph" then
+			draw_glyph(d.glyph, d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
+		elseif d.kind == "line" then
+			draw_line(d.t, d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff)
+		elseif d.kind == "quad" then
+			draw_quad(d.t, d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff, d.x3 - extent.xmin, d.y3 - extent.ymin + extent.yoff, d.x4 - extent.xmin, d.y4 - extent.ymin + extent.yoff)
 		end
 	end
-end
 
-create_surface(xmax - xmin, ymax - ymin)
-
-for i, d in ipairs(drawables) do
-	if d.kind == "glyph" then
-		draw_glyph(d.glyph, d.x - xmin, d.y - ymin)
-	elseif d.kind == "line" then
-		draw_line(d.t, d.x1 - xmin, d.y1 - ymin, d.x2 - xmin, d.y2 - ymin)
-	elseif d.kind == "quad" then
-		draw_quad(d.t, d.x1 - xmin, d.y1 - ymin, d.x2 - xmin, d.y2 - ymin, d.x3 - xmin, d.y3 - ymin, d.x4 - xmin, d.y4 - ymin)
+	-- draw staff
+	for y=0,em*4,em do
+		draw_line(1, xoffset - extent.xmin, y + extent.yoff - extent.ymin + yoffset, x + xoffset - extent.xmin, y + extent.yoff - extent.ymin + yoffset)
 	end
-end
-
--- draw staff
-for y=0,em*4,em do
-	draw_line(1, xoffset - xmin, y + yoffset - ymin, x + xoffset - xmin, y + yoffset - ymin)
 end
