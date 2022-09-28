@@ -214,6 +214,7 @@ abstract_dispatch = {
 }
 
 for _, voice in ipairs(voices) do
+	time = 0
 	for _, item in ipairs(voice) do
 		assert(abstract_dispatch[item.command])(item)
 	end
@@ -225,9 +226,9 @@ first_order = nil
 local staff2 = {}
 local tobeam = {}
 
-for staff, _ in pairs(staff1) do
-	staff2[staff] = {}
-	for i, el in ipairs(staff1[staff]) do
+for name, staff in pairs(staff1) do
+	staff2[name] = {}
+	for i, el in ipairs(staff) do
 		if el.kind == 'note' and el.beamed then
 			tobeam[#tobeam + 1] = el
 		else
@@ -248,15 +249,15 @@ for staff, _ in pairs(staff1) do
 				-- update the stem direction
 				for _, note in ipairs(tobeam) do
 					note.stemdir = stemdir
-					table.insert(staff2[staff], note)
+					table.insert(staff2[name], note)
 				end
-				table.insert(staff2[staff], {kind='beam', first=tobeam[1], last=tobeam[#tobeam]})
+				table.insert(staff2[name], {kind='beam', first=tobeam[1], last=tobeam[#tobeam]})
 			elseif #tobeam == 1 then
 				tobeam[1].beamed = false
-				table.insert(staff2[staff], tobeam[1])
+				table.insert(staff2[name], tobeam[1])
 			end
 			tobeam = {}
-			table.insert(staff2[staff], el)
+			table.insert(staff2[name], el)
 		end
 	end
 end
@@ -268,6 +269,7 @@ local lasttime = 0
 
 for staff, _ in pairs(staff2) do
 	staff3[staff] = {}
+	x = 10
 	for i, el in ipairs(staff2[staff]) do
 		if el.kind == "note" then
 			local rx = x
@@ -477,6 +479,6 @@ for staff, extent in pairs(extents) do
 
 	-- draw staff
 	for y=0,em*4,em do
-		draw_line(1, extent.xmin, y + extent.yoff - extent.ymin, x - extent.xmin, y + extent.yoff - extent.ymin)
+		draw_line(1, xmin, y + extent.yoff - extent.ymin, xmax, y + extent.yoff - extent.ymin)
 	end
 end
