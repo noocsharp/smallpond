@@ -100,6 +100,7 @@ local commands = {
 			if i >= #text then return nil end
 			local cmd = string.match(text, "^\\(%a+)", i)
 			if cmd == "end" then
+				i = i + 4
 				break
 			end
 			if cmd then
@@ -147,16 +148,21 @@ local commands = {
 		end
 
 		voices[#voices + 1] = voice
+		return i
 	end
 }
 
 function parse(text)
 	local i = 1
-	i = i + #(string.match(text, "^%s*", i) or "")
-	local cmd = string.match(text, "^\\(%a+)", i)
-	if cmd then
-		i = i + #cmd + 1
-		i = commands[string.match(text, "\\(%a+)", start)](text, i)
+
+	while true do
+		i = i + #(string.match(text, "^%s*", i) or "")
+		if i >= #text then return nil end
+		local cmd = string.match(text, "^\\(%a+)", i)
+		if cmd then
+			i = i + #cmd + 1
+			i = commands[string.match(text, "\\(%a+)", start)](text, i)
+		end
 	end
 end
 
