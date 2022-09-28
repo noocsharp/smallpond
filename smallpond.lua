@@ -52,7 +52,15 @@ local numerals = {
 	['9'] = 0xE089
 }
 
-commands = {
+voice_commands = {
+	staff = {
+		parse = function(text, start)
+			-- move past "\staff "
+			start = start + 7
+			local text = string.match(text, "(%a+)", start)
+			return 7 + #text, {command="changestaff", name=text}
+		end
+	},
 	clef = {
 		parse = function(text, start)
 			-- move past "\clef "
@@ -79,50 +87,76 @@ commands = {
 	}
 }
 
+local voices = {}
+
+local commands = {
+	voice = function (text, start)
+		local i = start
+
+		voice = {}
+		while true do
+			::start::
+			i = i + #(string.match(text, "^%s*", i) or "")
+			if i >= #text then return nil end
+			local cmd = string.match(text, "^\\(%a+)", i)
+			if cmd == "end" then
+				break
+			end
+			if cmd then
+				local size, data = voice_commands[cmd].parse(text, i)
+				i = i + size
+				table.insert(voice, data)
+				goto start
+			end
+
+			local s, e = string.find(text, "^|", i)
+			if s then
+				i = i + e - s + 1
+				table.insert(voice, {command="barline"})
+				goto start
+			end
+
+			local s, e = string.find(text, "^'", i)
+			if s then
+				i = i + e - s + 1
+				table.insert(voice, {command="changeoctave", count=-(e - s + 1)})
+				goto start
+			end
+
+			local s, e = string.find(text, "^,", i)
+			if s then
+				i = i + e - s + 1
+				table.insert(voice, {command="changeoctave", count=e - s + 1})
+				goto start
+			end
+
+			local s, e, note, acc, flags, count = string.find(text, "^([abcdefg])([fns]?)([v^]?)([1248]?)", i)
+			if note then
+				i = i + e - s + 1
+				local out = {command="newnote", note=note, acc=acc, count=tonumber(count)}
+				if string.find(flags, "v", 1, true) then
+					out.stemdir = 1
+				elseif string.find(flags, "^", 1, true) then
+					out.stemdir = -1
+				end
+				table.insert(voice, out)
+				goto start
+			end
+
+			error("unknown token")
+		end
+
+		voices[#voices + 1] = voice
+	end
+}
+
 function parse(text)
 	local i = 1
-	return function()
-		i = i + #(string.match(text, "^%s*", i) or "")
-		if i >= #text then return nil end
-		local cmd = string.match(text, "^\\(%a+)", i)
-		if cmd then
-			local size, data = commands[cmd].parse(text, i)
-			i = i + size
-			return data
-		end
-
-		local s, e = string.find(text, "^|", i)
-		if s then
-			i = i + e - s + 1
-			return {command="barline"}
-		end
-
-		local s, e = string.find(text, "^'", i)
-		if s then
-			i = i + e - s + 1
-			return {command="changeoctave", count=-(e - s + 1)}
-		end
-
-		local s, e = string.find(text, "^,", i)
-		if s then
-			i = i + e - s + 1
-			return {command="changeoctave", count=e - s + 1}
-		end
-
-		local s, e, note, acc, flags, count = string.find(text, "^([abcdefg])([fns]?)([v^]?)([1248]?)", i)
-		if note then
-			i = i + e - s + 1
-			local out = {command="newnote", note=note, acc=acc, count=tonumber(count)}
-			if string.find(flags, "v", 1, true) then
-				out.stemdir = 1
-			elseif string.find(flags, "^", 1, true) then
-				out.stemdir = -1
-			end
-			return out
-		end
-
-
-		error("unknown token")
+	i = i + #(string.match(text, "^%s*", i) or "")
+	local cmd = string.match(text, "^\\(%a+)", i)
+	if cmd then
+		i = i + #cmd + 1
+		i = commands[string.match(text, "\\(%a+)", start)](text, i)
 	end
 end
 
@@ -132,8 +166,9 @@ local time = 0 -- time in increments of denom
 local octave = 0
 local clef = Clef.treble
 local lastnote = nil
+local staff1 = {}
 -- first-order placement
-first_order = {}
+local first_order = nil
 abstract_dispatch = {
 	newnote = function(data)
 		local i = clef.place(data.note, octave)
@@ -153,6 +188,12 @@ abstract_dispatch = {
 		clef = class
 		octave = class.defoctave
 	end,
+	changestaff = function(data)
+		if staff1[data.name] == nil then
+			staff1[data.name] = {}
+		end
+		first_order = staff1[data.name]
+	end,
 	changetime = function(data)
 		table.insert(first_order, {kind="time", num=data.num, denom=data.denom})
 	end,
@@ -165,8 +206,12 @@ abstract_dispatch = {
 	end
 }
 
-for tok in parse(f:read("*a")) do
-	assert(abstract_dispatch[tok.command])(tok)
+parse(f:read("*a"))
+
+for _, voice in ipairs(voices) do
+	for _, item in ipairs(voice) do
+		assert(abstract_dispatch[item.command])(item)
+	end
 end
 
 -- second-order placement
