@@ -263,9 +263,6 @@ end
 
 local staff3 = {}
 
--- starting yoffset at 20 is a hack
-local yoffset = 20
-local xoffset = 20
 local x = 10
 local lasttime = 0
 
@@ -273,8 +270,8 @@ for staff, _ in pairs(staff2) do
 	staff3[staff] = {}
 	for i, el in ipairs(staff2[staff]) do
 		if el.kind == "note" then
-			local rx = xoffset + x
-			local ry = yoffset + (em*el.sy) / 2 + 2*em
+			local rx = x
+			local ry = (em*el.sy) / 2 + 2*em
 			if el.acc == "s" then
 				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
 			elseif el.acc == "f" then
@@ -300,13 +297,13 @@ for staff, _ in pairs(staff2) do
 			-- leger lines
 			if el.sy <= -6 then
 				for j = -6, el.sy, -2 do
-					table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * (j + 4)) / 2, x2=rx + w + .2*em, y2=yoffset + (em * (j + 4)) / 2})
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=(em * (j + 4)) / 2, x2=rx + w + .2*em, y2=(em * (j + 4)) / 2})
 				end
 			end
 
 			if el.sy >= 6 then
 				for j = 6, el.sy, 2 do
-					table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=yoffset + (em * (j + 4)) / 2, x2=rx + w + .2*em, y2=yoffset + (em * (j + 4)) / 2})
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=(em * (j + 4)) / 2, x2=rx + w + .2*em, y2=(em * (j + 4)) / 2})
 				end
 			end
 
@@ -351,15 +348,15 @@ for staff, _ in pairs(staff2) do
 					table.insert(staff3[staff], {kind="quad", x1=el.first.stemx - 0.5, y1=el.first.stemy, x2=el.last.stemx, y2=el.last.stemy, x4=el.first.stemx - 0.5, y4=el.first.stemy + 5, x3=el.last.stemx, y3=el.last.stemy + 5})
 		elseif el.kind == "barline" then
 			x = x + 20
-			table.insert(staff3[staff], {kind="line", t=1, x1=x + xoffset, y1=yoffset, x2=x + xoffset, y2 = yoffset + 4*em})
+			table.insert(staff3[staff], {kind="line", t=1, x1=x, y1=0, x2=x, y2 = 0 + 4*em})
 			x = x + 20
 		elseif el.kind == "clef" then
-			table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=xoffset + x, y=yoffset + el.class.yoff})
+			table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff})
 			x = x + 30
 		elseif el.kind == "time" then
 			-- TODO: draw multidigit time signatures properly
-			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=xoffset + x, y=yoffset + em})
-			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=xoffset + x, y=yoffset + 3*em})
+			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=x, y=em})
+			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=x, y=3*em})
 			x = x + 30
 		end
 	end
@@ -480,6 +477,6 @@ for staff, extent in pairs(extents) do
 
 	-- draw staff
 	for y=0,em*4,em do
-		draw_line(1, xoffset - extent.xmin, y + extent.yoff - extent.ymin + yoffset, x + xoffset - extent.xmin, y + extent.yoff - extent.ymin + yoffset)
+		draw_line(1, extent.xmin, y + extent.yoff - extent.ymin, x - extent.xmin, y + extent.yoff - extent.ymin)
 	end
 end
