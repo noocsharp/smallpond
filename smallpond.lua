@@ -287,10 +287,19 @@ while true do
 
 		if timed then
 			if staff2[name][i].time then
-				lowesttime = staff2[name].time
+				if not lowesttime then
+					lowesttime = staff2[name][i].time
+				end
+
+				if lowesttime > staff2[name][i].time then
+					lowesttime = staff2[name][i].time
+					todraw = {[1] = {staff=name, i=i}}
+					goto continue
+				end
+
 				empty = false
 				table.insert(todraw, {staff=name, i=i})
-				print("inserted timed element")
+				print("inserted timed element", staff2[name][i].time)
 			else
 				todraw = {}
 				table.insert(todraw, {staff=name, i=i})
