@@ -262,15 +262,58 @@ for name, staff in pairs(staff1) do
 	end
 end
 
+local staffindex = {}
 local staff3 = {}
 
 local x = 10
 local lasttime = 0
 
 for staff, _ in pairs(staff2) do
+	staffindex[staff] = 1
 	staff3[staff] = {}
-	x = 10
-	for i, el in ipairs(staff2[staff]) do
+end
+
+while true do
+	local todraw = {}
+	-- draw untimed elements before timed elements
+	-- we assume that staff2 contains lists sorted by time
+	local lowesttime
+	local timed = true
+	local empty = true
+	for name, i in pairs(staffindex) do
+		if not staff2[name][i] then
+			goto continue
+		end
+
+		if timed then
+			if staff2[name][i].time then
+				lowesttime = staff2[name].time
+				empty = false
+				table.insert(todraw, {staff=name, i=i})
+				print("inserted timed element")
+			else
+				todraw = {}
+				table.insert(todraw, {staff=name, i=i})
+				timed = false
+				empty = false
+				print("inserted first untimed element", staff2[name][i].kind)
+			end
+		else
+			if not staff2[name][i].time then
+				table.insert(todraw, {staff=name, i=i, xdiff=0})
+				print("inserted untimed element", staff2[name][i].kind)
+			end
+		end
+
+		::continue::
+	end
+
+	if empty then break end
+
+	local xdiffs = {}
+	for _, pair in ipairs(todraw) do
+		local staff = pair.staff
+		el = staff2[staff][pair.i]
 		if el.kind == "note" then
 			local rx = x
 			local ry = (em*el.sy) / 2 + 2*em
@@ -281,8 +324,8 @@ for staff, _ in pairs(staff2) do
 			elseif el.acc == "n" then
 				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
 			end
-
-			rx = rx + 10
+			local xdiff = 10
+			rx = rx + xdiff
 
 			local glyph
 			if el.length == 1 then
@@ -341,27 +384,37 @@ for staff, _ in pairs(staff2) do
 					-- TODO: move glyph extents to a precalculated table or something
 					local fx, fy = glyph_extents(Glyph["flag8thUp"])
 					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=ry -.168*em - 3.5*em})
-					x = x + fx
+					xdiff = xdiff + fx
 				end
 			end
-			x = x + 100 / el.length + 10
+			xdiff = xdiff + 100 / el.length + 10
+			xdiffs[staff] = xdiff
 			lasttime = el.time
 		elseif el.kind == "beam" then
 					table.insert(staff3[staff], {kind="quad", x1=el.first.stemx - 0.5, y1=el.first.stemy, x2=el.last.stemx, y2=el.last.stemy, x4=el.first.stemx - 0.5, y4=el.first.stemy + 5, x3=el.last.stemx, y3=el.last.stemy + 5})
 		elseif el.kind == "barline" then
-			x = x + 20
-			table.insert(staff3[staff], {kind="line", t=1, x1=x, y1=0, x2=x, y2 = 0 + 4*em})
-			x = x + 20
+			xdiffs[staff] = 20
+			table.insert(staff3[staff], {kind="line", t=1, x1=x + xdiffs[staff], y1=0, x2=x + xdiffs[staff], y2 = 0 + 4*em})
+			xdiffs[staff] = xdiffs[staff] + 20
 		elseif el.kind == "clef" then
 			table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff})
-			x = x + 30
+			xdiffs[staff] =  30
 		elseif el.kind == "time" then
 			-- TODO: draw multidigit time signatures properly
 			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=x, y=em})
 			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=x, y=3*em})
-			x = x + 30
+			xdiffs[staff] =  30
 		end
+
+		staffindex[staff] = staffindex[staff] + 1
 	end
+
+	local maxdiff = 0
+	for _, xd in pairs(xdiffs) do
+		maxdiff = math.max(maxdiff, xd)
+	end
+
+	x = x + maxdiff
 end
 
 -- calculate extents
