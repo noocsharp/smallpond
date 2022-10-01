@@ -88,6 +88,7 @@ voice_commands = {
 }
 
 local voices = {}
+local stafforder = {}
 
 local commands = {
 	voice = function (text, start)
@@ -157,6 +158,32 @@ local commands = {
 
 		voices[#voices + 1] = voice
 		return i
+	end,
+	layout = function (text, start)
+		local i = start
+		while true do
+			::start::
+			i = i + #(string.match(text, "^%s*", i) or "")
+			if i >= #text then return nil end
+			local cmd = string.match(text, "^\\(%a+)", i)
+			if cmd == 'end' then
+				i = i + 4
+				break
+			end
+
+			if cmd == 'staff' then
+				i = i + 7
+				local name = string.match(text, '^(%a+)', i)
+				table.insert(stafforder, name)
+				i = i + #name
+				goto start
+			end
+
+
+			error('unknown token')
+		end
+
+		return i
 	end
 }
 
@@ -169,7 +196,7 @@ function parse(text)
 		local cmd = string.match(text, "^\\(%a+)", i)
 		if cmd then
 			i = i + #cmd + 1
-			i = commands[string.match(text, "\\(%a+)", start)](text, i)
+			i = commands[cmd](text, i)
 		end
 	end
 end
@@ -542,7 +569,8 @@ for staff, extent in pairs(extents) do
 end
 create_surface(xmax - xmin, yoff)
 
-for staff, extent in pairs(extents) do
+for _, staff in ipairs(stafforder) do
+	local extent = extents[staff]
 	for i, d in ipairs(staff3[staff]) do
 		if d.kind == "glyph" then
 			draw_glyph(d.glyph, d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
