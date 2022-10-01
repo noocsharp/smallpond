@@ -377,9 +377,9 @@ while true do
 
 			if not el.stemdir and el.length > 1 then
 				if el.sy <= 0 then
-					el.stemdir = -1
-				else
 					el.stemdir = 1
+				else
+					el.stemdir = -1
 				end
 			end
 
