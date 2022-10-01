@@ -489,8 +489,18 @@ for _, staff in pairs(stafforder) do
 	extents[staff] = {xmin=0, ymin=0, xmax=0, ymax=0}
 	for i, d in ipairs(items) do
 		if d.kind == "glyph" then
-			-- TODO
-			local w, h = glyph_extents(glyph)
+			local w, h = glyph_extents(d.glyph)
+			if d.x - w < extents[staff].xmin then
+				extents[staff].xmin = d.x - w
+			elseif d.x + w > extents[staff].xmax then
+				extents[staff].xmax = d.x + w
+			end
+
+			if d.y - h < extents[staff].ymin then
+				extents[staff].ymin = d.y - h
+			elseif d.y + h > extents[staff].ymax then
+				extents[staff].ymax = d.y + h
+			end
 		elseif d.kind == "line" then
 			if d.x1 < extents[staff].xmin then
 				extents[staff].xmin = d.x1
