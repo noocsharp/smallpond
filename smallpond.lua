@@ -209,8 +209,8 @@ local octave = 0
 local clef = Clef.treble
 local lastnote = nil
 local staff1 = {}
+local curname
 -- first-order placement
-local first_order = nil
 abstract_dispatch = {
 	newnote = function(data)
 		local i = clef.place(data.note, octave)
@@ -222,13 +222,13 @@ abstract_dispatch = {
 			-- TODO: should we be emitting a beam here?
 		end
 		local note = {kind="note", acc=data.acc, beamed=beamed, beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, length=data.count, time=time, sy=i}
-		table.insert(first_order, note)
+		table.insert(staff1[curname], note)
 		lastnote = note
 		time = time + 1 / data.count
 	end,
 	changeclef = function(data)
 		local class = assert(Clef[data.kind])
-		table.insert(first_order, {kind="clef", class=class})
+		table.insert(staff1[curname], {kind="clef", class=class})
 		clef = class
 		octave = class.defoctave
 	end,
@@ -236,20 +236,20 @@ abstract_dispatch = {
 		if staff1[data.name] == nil then
 			staff1[data.name] = {}
 		end
-		first_order = staff1[data.name]
+		curname = data.name
 	end,
 	changetime = function(data)
-		table.insert(first_order, {kind="time", num=data.num, denom=data.denom})
+		table.insert(staff1[curname], {kind="time", num=data.num, denom=data.denom})
 	end,
 	barline = function(data)
-		table.insert(first_order, {kind="barline"})
+		table.insert(staff1[curname], {kind="barline"})
 		lastnote = nil
 	end,
 	changeoctave = function(data)
 		octave = octave + data.count
 	end,
 	srest = function(data)
-		table.insert(first_order, {kind='srest', length=data.count, time=time})
+		table.insert(staff1[curname], {kind='srest', length=data.count, time=time})
 		time = time + 1 / data.count
 	end
 }
@@ -260,8 +260,6 @@ for _, voice in ipairs(voices) do
 		assert(abstract_dispatch[item.command])(item)
 	end
 end
-
-first_order = nil
 
 -- second-order placement
 local staff2 = {}
