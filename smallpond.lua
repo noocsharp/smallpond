@@ -449,10 +449,11 @@ while true do
 		elseif el.kind == "beam" then
 			local m = (el.notes[#el.notes-1].stemy - el.notes[1].stemy) / (el.notes[#el.notes-1].stemx - el.notes[1].stemx)
 			for i, n in ipairs(el.pattern) do
-				if i == #el.pattern then break end
+				if i == 1 then goto continue end
 				for yoff=0, 7*(n-1), 7 do
-					table.insert(staff3[staff], {kind="quad", x1=el.notes[i].stemx - 0.5, y1=el.notes[i].stemy + yoff, x2=el.notes[i+1].stemx, y2=el.notes[i+1].stemy + yoff, x3=el.notes[i+1].stemx, y3=el.notes[i+1].stemy + 5 + yoff, x4=el.notes[i].stemx - 0.5, y4=el.notes[i].stemy + 5 + yoff})
+					table.insert(staff3[staff], {kind="quad", x1=el.notes[i-1].stemx - 0.5, y1=el.notes[i-1].stemy + yoff, x2=el.notes[i].stemx, y2=el.notes[i].stemy + yoff, x3=el.notes[i].stemx, y3=el.notes[i].stemy + 5 + yoff, x4=el.notes[i-1].stemx - 0.5, y4=el.notes[i-1].stemy + 5 + yoff})
 				end
+				::continue::
 			end
 		elseif el.kind == "barline" then
 			xdiffs[staff] = 20
