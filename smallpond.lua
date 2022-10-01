@@ -215,11 +215,13 @@ abstract_dispatch = {
 	newnote = function(data)
 		local i = clef.place(data.note, octave)
 		local beamed = false
-		if data.count == 8 and (time % .25 == 0 or (lastnote and lastnote.beamed)) then
+		local beamcount
+		if data.count >= 8 and (time % (1 / data.count) == 0 or (lastnote and lastnote.beamed)) then
 			beamed = true
+			beamcount = math.log(data.count) / math.log(2) - 2
 			-- TODO: should we be emitting a beam here?
 		end
-		local note = {kind="note", acc=data.acc, beamed=beamed, stemdir=data.stemdir, stemlen=3.5, length=data.count, time=time, sy=i}
+		local note = {kind="note", acc=data.acc, beamed=beamed, beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, length=data.count, time=time, sy=i}
 		table.insert(first_order, note)
 		lastnote = note
 		time = time + 1 / data.count
@@ -264,12 +266,14 @@ first_order = nil
 -- second-order placement
 local staff2 = {}
 local tobeam = {}
+local beampattern = {}
 
 for name, staff in pairs(staff1) do
 	staff2[name] = {}
 	for i, el in ipairs(staff) do
 		if el.kind == 'note' and el.beamed then
 			tobeam[#tobeam + 1] = el
+			beampattern[#beampattern + 1] = el.beamcount
 		else
 			if #tobeam > 1 then
 				-- check which way the stem should point on all the notes in the beam
@@ -290,12 +294,13 @@ for name, staff in pairs(staff1) do
 					note.stemdir = stemdir
 					table.insert(staff2[name], note)
 				end
-				table.insert(staff2[name], {kind='beam', first=tobeam[1], last=tobeam[#tobeam]})
+				table.insert(staff2[name], {kind='beam', notes=tobeam, pattern=beampattern})
 			elseif #tobeam == 1 then
 				tobeam[1].beamed = false
 				table.insert(staff2[name], tobeam[1])
 			end
 			tobeam = {}
+			beampattern = {}
 			table.insert(staff2[name], el)
 		end
 	end
@@ -385,9 +390,7 @@ while true do
 				glyph = Glyph["noteheadWhole"]
 			elseif el.length == 2 then
 				glyph = Glyph["noteheadHalf"]
-			elseif el.length == 4 then
-				glyph = Glyph["noteheadBlack"]
-			elseif el.length == 8 then
+			elseif el.length >= 4 then
 				glyph = Glyph["noteheadBlack"]
 			end
 
@@ -446,7 +449,13 @@ while true do
 		elseif el.kind == "srest" then
 			xdiffs[staff] = 0
 		elseif el.kind == "beam" then
-					table.insert(staff3[staff], {kind="quad", x1=el.first.stemx - 0.5, y1=el.first.stemy, x2=el.last.stemx, y2=el.last.stemy, x4=el.first.stemx - 0.5, y4=el.first.stemy + 5, x3=el.last.stemx, y3=el.last.stemy + 5})
+			local m = (el.notes[#el.notes-1].stemy - el.notes[1].stemy) / (el.notes[#el.notes-1].stemx - el.notes[1].stemx)
+			for i, n in ipairs(el.pattern) do
+				if i == #el.pattern then break end
+				for yoff=0, 7*(n-1), 7 do
+					table.insert(staff3[staff], {kind="quad", x1=el.notes[i].stemx - 0.5, y1=el.notes[i].stemy + yoff, x2=el.notes[i+1].stemx, y2=el.notes[i+1].stemy + yoff, x3=el.notes[i+1].stemx, y3=el.notes[i+1].stemy + 5 + yoff, x4=el.notes[i].stemx - 0.5, y4=el.notes[i].stemy + 5 + yoff})
+				end
+			end
 		elseif el.kind == "barline" then
 			xdiffs[staff] = 20
 			table.insert(staff3[staff], {kind="line", t=1, x1=x + xdiffs[staff], y1=0, x2=x + xdiffs[staff], y2 = 0 + 4*em})
