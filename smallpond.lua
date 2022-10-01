@@ -132,9 +132,11 @@ local commands = {
 			end
 
 			-- TODO: should we be more strict about accidentals and stem orientations on rests?
-			local s, e, note, acc, flags, count = string.find(text, "^([abcdefgs])([fns]?)([v^]?)([1248])", i)
+			local s, e, note, acc, flags, count = string.find(text, "^([abcdefgs])([fns]?)([v^]?)(%d+)", i)
 			if note then
 				i = i + e - s + 1
+				-- make sure that count is a power of 2
+				assert(math.ceil(math.log(count)/math.log(2)) == math.floor(math.log(count)/math.log(2)), "note count is not a power of 2")
 				local out
 				if note == 's' then
 					out = {command='srest', count=tonumber(count)}
