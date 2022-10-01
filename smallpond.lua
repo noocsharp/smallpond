@@ -484,7 +484,8 @@ end
 -- calculate extents
 local extents = {}
 
-for staff, items in pairs(staff3) do
+for _, staff in pairs(stafforder) do
+	local items = staff3[staff]
 	extents[staff] = {xmin=0, ymin=0, xmax=0, ymax=0}
 	for i, d in ipairs(items) do
 		if d.kind == "glyph" then
@@ -569,7 +570,8 @@ end
 local xmax = 0
 local yoff = 0
 local xmin = 0
-for staff, extent in pairs(extents) do
+for _, staff in pairs(stafforder) do
+	local extent = extents[staff]
 	if xmin > extent.xmin then
 		xmin = extent.xmin
 	end
