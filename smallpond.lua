@@ -333,23 +333,28 @@ while true do
 				if lowesttime > staff2[name][i].time then
 					lowesttime = staff2[name][i].time
 					todraw = {[1] = {staff=name, i=i}}
+					print("inserted first timed element", staff2[name][i].time, name)
+					goto continue
+				end
+
+				if lowesttime < staff2[name][i].time then
 					goto continue
 				end
 
 				empty = false
 				table.insert(todraw, {staff=name, i=i})
-				print("inserted timed element", staff2[name][i].time)
+				print("inserted timed element", staff2[name][i].time, name)
 			else
 				todraw = {}
 				table.insert(todraw, {staff=name, i=i})
 				timed = false
 				empty = false
-				print("inserted first untimed element", staff2[name][i].kind)
+				print("inserted first untimed element", staff2[name][i].kind, name)
 			end
 		else
 			if not staff2[name][i].time then
 				table.insert(todraw, {staff=name, i=i, xdiff=0})
-				print("inserted untimed element", staff2[name][i].kind)
+				print("inserted untimed element", staff2[name][i].kind, name)
 			end
 		end
 
