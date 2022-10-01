@@ -131,10 +131,16 @@ local commands = {
 				goto start
 			end
 
-			local s, e, note, acc, flags, count = string.find(text, "^([abcdefg])([fns]?)([v^]?)([1248]?)", i)
+			-- TODO: should we be more strict about accidentals and stem orientations on rests?
+			local s, e, note, acc, flags, count = string.find(text, "^([abcdefgs])([fns]?)([v^]?)([1248])", i)
 			if note then
 				i = i + e - s + 1
-				local out = {command="newnote", note=note, acc=acc, count=tonumber(count)}
+				local out
+				if note == 's' then
+					out = {command='srest', count=tonumber(count)}
+				else
+					out = {command="newnote", note=note, acc=acc, count=tonumber(count)}
+				end
 				if string.find(flags, "v", 1, true) then
 					out.stemdir = 1
 				elseif string.find(flags, "^", 1, true) then
@@ -180,7 +186,7 @@ abstract_dispatch = {
 	newnote = function(data)
 		local i = clef.place(data.note, octave)
 		local beamed = false
-		if data.count == 8 and (time % .25 == 0 or lastnote.beamed) then
+		if data.count == 8 and (time % .25 == 0 or (lastnote and lastnote.beamed)) then
 			beamed = true
 			-- TODO: should we be emitting a beam here?
 		end
@@ -210,6 +216,10 @@ abstract_dispatch = {
 	end,
 	changeoctave = function(data)
 		octave = octave + data.count
+	end,
+	srest = function(data)
+		table.insert(first_order, {kind='srest', length=data.count, time=time})
+		time = time + 1 / data.count
 	end
 }
 
@@ -399,6 +409,8 @@ while true do
 			xdiff = xdiff + 100 / el.length + 10
 			xdiffs[staff] = xdiff
 			lasttime = el.time
+		elseif el.kind == "srest" then
+			xdiffs[staff] = 0
 		elseif el.kind == "beam" then
 					table.insert(staff3[staff], {kind="quad", x1=el.first.stemx - 0.5, y1=el.first.stemy, x2=el.last.stemx, y2=el.last.stemy, x4=el.first.stemx - 0.5, y4=el.first.stemy + 5, x3=el.last.stemx, y3=el.last.stemy + 5})
 		elseif el.kind == "barline" then
