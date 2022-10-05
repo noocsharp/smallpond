@@ -92,13 +92,37 @@ local stafforder = {}
 
 local commands = {
 	voice = function (text, start)
+		local parsenote = function(text, start)
+			-- TODO: should we be more strict about accidentals and stem orientations on rests?
+			local s, e, note, acc, flags, count = string.find(text, "^([abcdefgs])([fns]?)([v^]?)(%d*)", start)
+			if note then
+				-- make sure that count is a power of 2
+				if #count ~= 0 then
+					assert(math.ceil(math.log(count)/math.log(2)) == math.floor(math.log(count)/math.log(2)), "note count is not a power of 2")
+				end
+				local out
+				if note == 's' then
+					out = {command='srest', count=tonumber(count)}
+				else
+					out = {command="note", note=note, acc=acc, count=tonumber(count)}
+				end
+				if string.find(flags, "v", 1, true) then
+					out.stemdir = 1
+				elseif string.find(flags, "^", 1, true) then
+					out.stemdir = -1
+				end
+				return start + e - s + 1, out
+			end
+
+			error("unknown token")
+		end
 		local i = start
 
 		voice = {}
 		while true do
 			::start::
 			i = i + #(string.match(text, "^%s*", i) or "")
-			if i >= #text then return nil end
+			if i >= #text then return i end
 			local cmd = string.match(text, "^\\(%a+)", i)
 			if cmd == "end" then
 				i = i + 4
@@ -131,29 +155,29 @@ local commands = {
 				table.insert(voice, {command="changeoctave", count=e - s + 1})
 				goto start
 			end
-
-			-- TODO: should we be more strict about accidentals and stem orientations on rests?
-			local s, e, note, acc, flags, count = string.find(text, "^([abcdefgs])([fns]?)([v^]?)(%d+)", i)
-			if note then
-				i = i + e - s + 1
-				-- make sure that count is a power of 2
-				assert(math.ceil(math.log(count)/math.log(2)) == math.floor(math.log(count)/math.log(2)), "note count is not a power of 2")
-				local out
-				if note == 's' then
-					out = {command='srest', count=tonumber(count)}
-				else
-					out = {command="newnote", note=note, acc=acc, count=tonumber(count)}
+			local s, e, count = string.find(text, "^%b<>(%d+)", i)
+			if s then
+				i = i + 1
+				local group = {command="newnotegroup", notes = {}}
+				while i <= e - 1 - #count do
+					i = i + #(string.match(text, "^%s*", i) or "")
+					if i >= #text then return i end
+					i, out = parsenote(text, i)
+					table.insert(group.notes, out)
 				end
-				if string.find(flags, "v", 1, true) then
-					out.stemdir = 1
-				elseif string.find(flags, "^", 1, true) then
-					out.stemdir = -1
-				end
-				table.insert(voice, out)
+				i = e + 1
+				group.count = tonumber(count)
+				table.insert(voice, group)
 				goto start
 			end
 
-			error("unknown token")
+			i, out = parsenote(text, i)
+
+			if out.command == 'srest' then
+				table.insert(voice, out)
+			else
+				table.insert(voice, {command="newnotegroup", count=out.count, notes={[1] = out}})
+			end
 		end
 
 		voices[#voices + 1] = voice
@@ -164,7 +188,7 @@ local commands = {
 		while true do
 			::start::
 			i = i + #(string.match(text, "^%s*", i) or "")
-			if i >= #text then return nil end
+			if i >= #text then return i end
 			local cmd = string.match(text, "^\\(%a+)", i)
 			if cmd == 'end' then
 				i = i + 4
@@ -212,16 +236,19 @@ local staff1 = {}
 local curname
 -- first-order placement
 abstract_dispatch = {
-	newnote = function(data)
-		local i = clef.place(data.note, octave)
-		local beamed = false
+	newnotegroup = function(data)
+		local heads = {}
+		local beamed
 		local beamcount
 		if data.count >= 8 and (time % (1 / data.count) == 0 or (lastnote and lastnote.beamed)) then
 			beamed = true
 			beamcount = math.log(data.count) / math.log(2) - 2
 			-- TODO: should we be emitting a beam here?
 		end
-		local note = {kind="note", acc=data.acc, beamed=beamed, beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, length=data.count, time=time, sy=i}
+		for _, note in ipairs(data.notes) do
+			table.insert(heads, {acc=note.acc, stemdir=note.stemdir, y=clef.place(note.note, octave)})
+		end
+		local note = {kind="notecolumn", beamed=beamed, beamcount=beamcount, stemlen=3.5, length=data.count, time=time, heads=heads}
 		table.insert(staff1[curname], note)
 		lastnote = note
 		time = time + 1 / data.count
@@ -269,7 +296,7 @@ local beampattern = {}
 for name, staff in pairs(staff1) do
 	staff2[name] = {}
 	for i, el in ipairs(staff) do
-		if el.kind == 'note' and el.beamed then
+		if el.kind == 'notecolumn' and el.beamed then
 			tobeam[#tobeam + 1] = el
 			beampattern[#beampattern + 1] = el.beamcount
 		else
@@ -277,7 +304,8 @@ for name, staff in pairs(staff1) do
 				-- check which way the stem should point on all the notes in the beam
 				local ysum = 0
 				for _, note in ipairs(tobeam) do
-					ysum = ysum + note.sy
+					-- FIXME: note.heads[1].y is wrong
+					ysum = ysum + note.heads[1].y
 				end
 
 				local stemdir
@@ -336,7 +364,7 @@ while true do
 				if lowesttime > staff2[name][i].time then
 					lowesttime = staff2[name][i].time
 					todraw = {[1] = {staff=name, i=i}}
-					print("inserted first timed element", staff2[name][i].time, name)
+					print("inserted first timed element", staff2[name][i].kind, staff2[name][i].time, name)
 					goto continue
 				end
 
@@ -346,7 +374,7 @@ while true do
 
 				empty = false
 				table.insert(todraw, {staff=name, i=i})
-				print("inserted timed element", staff2[name][i].time, name)
+				print("inserted timed element", staff2[name][i].kind, staff2[name][i].time, name)
 			else
 				todraw = {}
 				table.insert(todraw, {staff=name, i=i})
@@ -370,16 +398,8 @@ while true do
 	for _, pair in ipairs(todraw) do
 		local staff = pair.staff
 		el = staff2[staff][pair.i]
-		if el.kind == "note" then
+		if el.kind == "notecolumn" then
 			local rx = x
-			local ry = (em*el.sy) / 2 + 2*em
-			if el.acc == "s" then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
-			elseif el.acc == "f" then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry})
-			elseif el.acc == "n" then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
-			end
 			local xdiff = 10
 			rx = rx + xdiff
 
@@ -393,23 +413,44 @@ while true do
 			end
 
 			local w, h = glyph_extents(glyph)
-			-- leger lines
-			if el.sy <= -6 then
-				for j = -6, el.sy, -2 do
-					table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=(em * (j + 4)) / 2, x2=rx + w + .2*em, y2=(em * (j + 4)) / 2})
+
+			local heightsum = 0
+			local lowheight
+			local highheight
+			for _, head in ipairs(el.heads) do
+				heightsum = heightsum + head.y
+				local ry = (em*head.y) / 2 + 2*em
+				if not lowheight then lowheight = ry end
+				if not highheight then highheight = ry end
+				table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=rx, y=ry})
+				if el.acc == "s" then
+					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
+				elseif el.acc == "f" then
+					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry})
+				elseif el.acc == "n" then
+					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
+				end
+
+				lowheight = math.min(lowheight, ry)
+				highheight = math.max(highheight, ry)
+
+				-- TODO: only do this once per column
+				-- leger lines
+				if head.y <= -6 then
+					for j = -6, head.y, -2 do
+						table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=(em * (j + 4)) / 2, x2=rx + w + .2*em, y2=(em * (j + 4)) / 2})
+					end
+				end
+
+				if head.y >= 6 then
+					for j = 6, head.y, 2 do
+						table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=(em * (j + 4)) / 2, x2=rx + w + .2*em, y2=(em * (j + 4)) / 2})
+					end
 				end
 			end
-
-			if el.sy >= 6 then
-				for j = 6, el.sy, 2 do
-					table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=(em * (j + 4)) / 2, x2=rx + w + .2*em, y2=(em * (j + 4)) / 2})
-				end
-			end
-
-			table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=rx, y=ry})
 
 			if not el.stemdir and el.length > 1 then
-				if el.sy <= 0 then
+				if heightsum <= 0 then
 					el.stemdir = 1
 				else
 					el.stemdir = -1
@@ -422,22 +463,22 @@ while true do
 					-- stem up
 					-- advance width for bravura is 1.18 - .1 for stem width
 					el.stemx = w + rx - 1.08
-					el.stemy = ry -.168*em - el.stemlen*em
-					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=ry - .168*em, x2=el.stemx, y2=ry -.168*em - el.stemlen*em})
+					el.stemy = lowheight -.168*em - el.stemlen*em
+					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em})
 				else
 					el.stemx = rx + .5
-					el.stemy = ry + el.stemlen*em
-					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=ry + .168*em, x2=el.stemx, y2=ry + el.stemlen*em})
+					el.stemy = lowheight + el.stemlen*em
+					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=lowheight + el.stemlen*em})
 				end
 			end
 
 			if el.length == 8 and not el.beamed then
 				if el.stemdir == 1 then
-					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=ry + 3.5*em})
+					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=lowheight + 3.5*em})
 				else
 					-- TODO: move glyph extents to a precalculated table or something
 					local fx, fy = glyph_extents(Glyph["flag8thUp"])
-					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=ry -.168*em - 3.5*em})
+					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=lowheight -.168*em - 3.5*em})
 					xdiff = xdiff + fx
 				end
 			end
