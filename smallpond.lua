@@ -94,7 +94,7 @@ local commands = {
 	voice = function (text, start)
 		local parsenote = function(text, start)
 			-- TODO: should we be more strict about accidentals and stem orientations on rests?
-			local s, e, note, acc, flags, count = string.find(text, "^([abcdefgs])([fns]?)([v^]?)(%d*)", start)
+			local s, e, note, acc, flags, shift, count = string.find(text, "^([abcdefgs])([fns]?)([v^]?)([,']*)(%d*)", start)
 			if note then
 				-- make sure that count is a power of 2
 				if #count ~= 0 then
@@ -111,6 +111,9 @@ local commands = {
 				elseif string.find(flags, "^", 1, true) then
 					out.stemdir = -1
 				end
+				local _, down = string.gsub(shift, ',', '')
+				local _, up = string.gsub(shift, "'", '')
+				out.shift = up - down
 				return start + e - s + 1, out
 			end
 
@@ -142,19 +145,6 @@ local commands = {
 				goto start
 			end
 
-			local s, e = string.find(text, "^'", i)
-			if s then
-				i = i + e - s + 1
-				table.insert(voice, {command="changeoctave", count=-(e - s + 1)})
-				goto start
-			end
-
-			local s, e = string.find(text, "^,", i)
-			if s then
-				i = i + e - s + 1
-				table.insert(voice, {command="changeoctave", count=e - s + 1})
-				goto start
-			end
 			local s, e, count = string.find(text, "^%b<>(%d+)", i)
 			if s then
 				i = i + 1
@@ -246,6 +236,7 @@ abstract_dispatch = {
 			-- TODO: should we be emitting a beam here?
 		end
 		for _, note in ipairs(data.notes) do
+			octave = octave - note.shift
 			table.insert(heads, {acc=note.acc, stemdir=note.stemdir, y=clef.place(note.note, octave)})
 		end
 		local note = {kind="notecolumn", beamed=beamed, beamcount=beamcount, stemlen=3.5, length=data.count, time=time, heads=heads}
@@ -271,9 +262,6 @@ abstract_dispatch = {
 	barline = function(data)
 		table.insert(staff1[curname], {kind="barline"})
 		lastnote = nil
-	end,
-	changeoctave = function(data)
-		octave = octave + data.count
 	end,
 	srest = function(data)
 		table.insert(staff1[curname], {kind='srest', length=data.count, time=time})
