@@ -278,46 +278,53 @@ end
 
 -- second-order placement
 local staff2 = {}
-local tobeam = {}
-local beampattern = {}
+
+function trybeam(staff, tobeam, beampattern)
+	if #tobeam > 1 then
+		-- check which way the stem should point on all the notes in the beam
+		local ysum = 0
+		for _, note in ipairs(tobeam) do
+			-- FIXME: note.heads[1].y is wrong
+			ysum = ysum + note.heads[1].y
+		end
+
+		local stemdir
+		if ysum >= 0 then
+			stemdir = -1
+		else
+			stemdir = 1
+		end
+
+		-- update the stem direction
+		for _, note in ipairs(tobeam) do
+			note.stemdir = stemdir
+			table.insert(staff, note)
+		end
+		table.insert(staff, {kind='beam', notes=tobeam, pattern=beampattern})
+	elseif #tobeam == 1 then
+		tobeam[1].beamed = false
+		table.insert(staff, tobeam[1])
+	end
+end
 
 for name, staff in pairs(staff1) do
 	staff2[name] = {}
+	local tobeam = {}
+	local beampattern = {}
 	for i, el in ipairs(staff) do
 		if el.kind == 'notecolumn' and el.beamed then
 			tobeam[#tobeam + 1] = el
 			beampattern[#beampattern + 1] = el.beamcount
 		else
-			if #tobeam > 1 then
-				-- check which way the stem should point on all the notes in the beam
-				local ysum = 0
-				for _, note in ipairs(tobeam) do
-					-- FIXME: note.heads[1].y is wrong
-					ysum = ysum + note.heads[1].y
-				end
-
-				local stemdir
-				if ysum >= 0 then
-					stemdir = -1
-				else
-					stemdir = 1
-				end
-
-				-- update the stem direction
-				for _, note in ipairs(tobeam) do
-					note.stemdir = stemdir
-					table.insert(staff2[name], note)
-				end
-				table.insert(staff2[name], {kind='beam', notes=tobeam, pattern=beampattern})
-			elseif #tobeam == 1 then
-				tobeam[1].beamed = false
-				table.insert(staff2[name], tobeam[1])
-			end
+			trybeam(staff2[name], tobeam, beampattern)
+			table.insert(staff2[name], el)
 			tobeam = {}
 			beampattern = {}
-			table.insert(staff2[name], el)
 		end
 	end
+	trybeam(staff2[name], tobeam, beampattern)
+	tobeam = {}
+	beampattern = {}
 end
 
 local staffindex = {}
