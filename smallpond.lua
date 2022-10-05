@@ -409,6 +409,13 @@ while true do
 
 			local w, h = glyph_extents(glyph)
 
+			local preoffset = 0
+			for _, head in ipairs(el.heads) do
+				if #head.acc then
+					preoffset = 10
+				end
+			end
+
 			local heightsum = 0
 			local lowheight
 			local highheight
@@ -417,12 +424,12 @@ while true do
 				local ry = (em*head.y) / 2 + 2*em
 				if not lowheight then lowheight = ry end
 				if not highheight then highheight = ry end
-				table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=rx, y=ry})
-				if el.acc == "s" then
+				table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=preoffset + rx, y=ry})
+				if head.acc == "s" then
 					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
-				elseif el.acc == "f" then
+				elseif head.acc == "f" then
 					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry})
-				elseif el.acc == "n" then
+				elseif head.acc == "n" then
 					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
 				end
 
@@ -433,13 +440,13 @@ while true do
 				-- leger lines
 				if head.y <= -6 then
 					for j = -6, head.y, -2 do
-						table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=(em * (j + 4)) / 2, x2=rx + w + .2*em, y2=(em * (j + 4)) / 2})
+						table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2})
 					end
 				end
 
 				if head.y >= 6 then
 					for j = 6, head.y, 2 do
-						table.insert(staff3[staff], {kind="line", t=1.2, x1=rx - .2*em, y1=(em * (j + 4)) / 2, x2=rx + w + .2*em, y2=(em * (j + 4)) / 2})
+						table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2})
 					end
 				end
 			end
@@ -457,11 +464,11 @@ while true do
 				if el.stemdir == -1 then
 					-- stem up
 					-- advance width for bravura is 1.18 - .1 for stem width
-					el.stemx = w + rx - 1.08
+					el.stemx = w + rx - 1.08 + preoffset
 					el.stemy = lowheight -.168*em - el.stemlen*em
 					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em})
 				else
-					el.stemx = rx + .5
+					el.stemx = rx + .5 + preoffset
 					el.stemy = lowheight + el.stemlen*em
 					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=lowheight + el.stemlen*em})
 				end
@@ -469,7 +476,7 @@ while true do
 
 			if el.length == 8 and not el.beamed then
 				if el.stemdir == 1 then
-					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=rx, y=lowheight + 3.5*em})
+					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=preoffset + rx, y=lowheight + 3.5*em})
 				else
 					-- TODO: move glyph extents to a precalculated table or something
 					local fx, fy = glyph_extents(Glyph["flag8thUp"])
