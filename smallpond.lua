@@ -364,6 +364,7 @@ end
 
 local staffindex = {}
 local staff3 = {}
+local extra3 = {}
 
 local x = 10
 local lasttime = 0
@@ -380,6 +381,7 @@ while true do
 	local lowesttime
 	local timed = true
 	local empty = true
+	local barline = true
 	for name, i in pairs(staffindex) do
 		if not staff2[name][i] then
 			goto continue
@@ -393,7 +395,7 @@ while true do
 
 				if lowesttime > staff2[name][i].time then
 					lowesttime = staff2[name][i].time
-					todraw = {[1] = {staff=name, i=i}}
+					todraw = {[name] = i}
 					print("inserted first timed element", staff2[name][i].kind, staff2[name][i].time, name)
 					goto continue
 				end
@@ -403,18 +405,24 @@ while true do
 				end
 
 				empty = false
-				table.insert(todraw, {staff=name, i=i})
+				barline = false
+				todraw[name] = i
 				print("inserted timed element", staff2[name][i].kind, staff2[name][i].time, name)
 			else
-				todraw = {}
-				table.insert(todraw, {staff=name, i=i})
+				todraw = {[name] = i}
 				timed = false
 				empty = false
+				if staff2[name][i].kind ~= 'barline' then
+					barline = false
+				end
 				print("inserted first untimed element", staff2[name][i].kind, name)
 			end
 		else
 			if not staff2[name][i].time then
-				table.insert(todraw, {staff=name, i=i, xdiff=0})
+				todraw[name] = i
+				if staff2[name][i].kind ~= 'barline' then
+					barline = false
+				end
 				print("inserted untimed element", staff2[name][i].kind, name)
 			end
 		end
@@ -424,10 +432,26 @@ while true do
 
 	if empty then break end
 
+	-- special case barline since it goes across staves
+	-- (handle it after extents are calculated)
+	-- FIXME: there's a more efficient way to do this
+	if barline then
+		print('barline')
+		x = x + 20
+		table.insert(extra3, {kind="barline", x=x})
+		x = x + 10
+	else
+		for staff, index in pairs(todraw) do
+			if staff2[staff][index].kind == 'barline' then
+				todraw[staff] = nil
+			end
+		end
+	end
+
 	local xdiffs = {}
-	for _, pair in ipairs(todraw) do
-		local staff = pair.staff
-		el = staff2[staff][pair.i]
+	for staff, index in pairs(todraw) do
+		print('drawing', staff)
+		el = staff2[staff][index]
 		if el.kind == "notecolumn" then
 			local rx = x
 			local xdiff = 10
@@ -533,10 +557,6 @@ while true do
 				end
 				::continue::
 			end
-		elseif el.kind == "barline" then
-			xdiffs[staff] = 20
-			table.insert(staff3[staff], {kind="line", t=1, x1=x + xdiffs[staff], y1=0, x2=x + xdiffs[staff], y2 = 0 + 4*em})
-			xdiffs[staff] = xdiffs[staff] + 20
 		elseif el.kind == "clef" then
 			table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff})
 			xdiffs[staff] =  30
@@ -556,6 +576,7 @@ while true do
 	end
 
 	x = x + maxdiff
+
 end
 
 -- calculate extents
@@ -670,6 +691,7 @@ for _, staff in pairs(stafforder) do
 	extent.yoff = yoff
 	yoff = yoff + extent.ymax - extent.ymin
 end
+
 create_surface(xmax - xmin, yoff)
 
 for _, staff in ipairs(stafforder) do
@@ -687,5 +709,14 @@ for _, staff in ipairs(stafforder) do
 	-- draw staff
 	for y=0,em*4,em do
 		draw_line(1, xmin, y + extent.yoff - extent.ymin, xmax, y + extent.yoff - extent.ymin)
+	end
+end
+
+-- draw barlines
+print(#extra3)
+for _, item in ipairs(extra3) do
+	if item.kind == 'barline' then
+		print(item.x, 0, item.x, yoff + 4*em)
+		draw_line(1, item.x, 0, item.x, yoff + 4*em)
 	end
 end
