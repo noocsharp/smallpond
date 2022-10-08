@@ -92,25 +92,41 @@ local stafforder = {}
 
 local commands = {
 	voice = function (text, start)
+		local parsenotecolumn = function(text, start)
+			local s, e, flags, count, beam = string.find(text, "^([v^]?)(%d*)([%[%]]?)", start)
+			local out = {}
+
+			if string.find(flags, "v", 1, true) then
+				out.stemdir = 1
+			elseif string.find(flags, "^", 1, true) then
+				out.stemdir = -1
+			end
+
+			if beam == '[' then
+				out.beam = 1
+			elseif beam == ']' then
+				out.beam = -1
+			end
+
+			-- make sure that count is a power of 2
+			if #count ~= 0 then
+				assert(math.ceil(math.log(count)/math.log(2)) == math.floor(math.log(count)/math.log(2)), "note count is not a power of 2")
+			end
+			out.count = tonumber(count)
+
+			return start + e - s + 1, out
+		end
 		local parsenote = function(text, start)
 			-- TODO: should we be more strict about accidentals and stem orientations on rests?
-			local s, e, note, acc, flags, shift, count = string.find(text, "^([abcdefgs])([fns]?)([v^]?)([,']*)(%d*)", start)
+			local s, e, note, acc, shift = string.find(text, "^([abcdefgs])([fns]?)([,']*)", start)
 			if note then
-				-- make sure that count is a power of 2
-				if #count ~= 0 then
-					assert(math.ceil(math.log(count)/math.log(2)) == math.floor(math.log(count)/math.log(2)), "note count is not a power of 2")
-				end
 				local out
 				if note == 's' then
 					out = {command='srest', count=tonumber(count)}
 				else
 					out = {command="note", note=note, acc=acc, count=tonumber(count)}
 				end
-				if string.find(flags, "v", 1, true) then
-					out.stemdir = 1
-				elseif string.find(flags, "^", 1, true) then
-					out.stemdir = -1
-				end
+
 				local _, down = string.gsub(shift, ',', '')
 				local _, up = string.gsub(shift, "'", '')
 				out.shift = up - down
@@ -145,28 +161,33 @@ local commands = {
 				goto start
 			end
 
-			local s, e, count = string.find(text, "^%b<>(%d+)", i)
+			local s, e = string.find(text, "^%b<>", i)
 			if s then
 				i = i + 1
 				local group = {command="newnotegroup", notes = {}}
-				while i <= e - 1 - #count do
+				while i <= e - 1 do
 					i = i + #(string.match(text, "^%s*", i) or "")
 					if i >= #text then return i end
 					i, out = parsenote(text, i)
 					table.insert(group.notes, out)
 				end
 				i = e + 1
-				group.count = tonumber(count)
+				i, out = parsenotecolumn(text, i)
+				group.count = out.count
+				group.stemdir = out.stemdir
+				group.stemdir = out.stemdir
+				group.beam = out.beam
 				table.insert(voice, group)
 				goto start
 			end
 
-			i, out = parsenote(text, i)
+			i, note = parsenote(text, i)
+			i, col = parsenotecolumn(text, i)
 
-			if out.command == 'srest' then
-				table.insert(voice, out)
+			if note.command == 'srest' then
+				table.insert(voice, {command='srest', count=col.count})
 			else
-				table.insert(voice, {command="newnotegroup", count=out.count, notes={[1] = out}})
+				table.insert(voice, {command="newnotegroup", count=col.count, beam=col.beam, notes={[1] = note}})
 			end
 		end
 
@@ -224,22 +245,29 @@ local clef = Clef.treble
 local lastnote = nil
 local staff1 = {}
 local curname
+local inbeam = 0
 -- first-order placement
 abstract_dispatch = {
 	newnotegroup = function(data)
 		local heads = {}
-		local beamed
-		local beamcount
-		if data.count >= 8 and (time % (1 / data.count) == 0 or (lastnote and lastnote.beamed)) then
-			beamed = true
-			beamcount = math.log(data.count) / math.log(2) - 2
-			-- TODO: should we be emitting a beam here?
-		end
+		local beamcount = math.log(data.count) / math.log(2) - 2
 		for _, note in ipairs(data.notes) do
 			octave = octave - note.shift
 			table.insert(heads, {acc=note.acc, stemdir=note.stemdir, y=clef.place(note.note, octave)})
 		end
-		local note = {kind="notecolumn", beamed=beamed, beamcount=beamcount, stemlen=3.5, length=data.count, time=time, heads=heads}
+
+		local note = {kind="notecolumn", beamcount=beamcount, stemlen=3.5, length=data.count, time=time, heads=heads}
+		if data.beam == 1 then
+			assert(inbeam == 0)
+			inbeam = 1
+			note.beamed = inbeam
+		elseif data.beam == -1 then
+			assert(inbeam == 1)
+			inbeam = 0
+			note.beamed = -1
+		else
+			note.beamed = inbeam
+		end
 		table.insert(staff1[curname], note)
 		lastnote = note
 		time = time + 1 / data.count
@@ -312,14 +340,21 @@ for name, staff in pairs(staff1) do
 	local tobeam = {}
 	local beampattern = {}
 	for i, el in ipairs(staff) do
-		if el.kind == 'notecolumn' and el.beamed then
-			tobeam[#tobeam + 1] = el
-			beampattern[#beampattern + 1] = el.beamcount
+		if el.kind == 'notecolumn' then
+			if el.beamed == 1 then
+				tobeam[#tobeam + 1] = el
+				beampattern[#beampattern + 1] = el.beamcount
+			elseif el.beamed == -1 then
+				tobeam[#tobeam + 1] = el
+				beampattern[#beampattern + 1] = el.beamcount
+				trybeam(staff2[name], tobeam, beampattern)
+				tobeam = {}
+				beampattern = {}
+			else
+				table.insert(staff2[name], el)
+			end
 		else
-			trybeam(staff2[name], tobeam, beampattern)
 			table.insert(staff2[name], el)
-			tobeam = {}
-			beampattern = {}
 		end
 	end
 	trybeam(staff2[name], tobeam, beampattern)
