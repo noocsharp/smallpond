@@ -436,10 +436,9 @@ while true do
 	-- (handle it after extents are calculated)
 	-- FIXME: there's a more efficient way to do this
 	if barline then
-		print('barline')
 		x = x + 20
 		table.insert(extra3, {kind="barline", x=x})
-		x = x + 10
+		x = x + 15
 	else
 		for staff, index in pairs(todraw) do
 			if staff2[staff][index].kind == 'barline' then
@@ -450,7 +449,6 @@ while true do
 
 	local xdiffs = {}
 	for staff, index in pairs(todraw) do
-		print('drawing', staff)
 		el = staff2[staff][index]
 		if el.kind == "notecolumn" then
 			local rx = x
@@ -677,8 +675,9 @@ end
 
 local xmax = 0
 local yoff = 0
+local firstymin, lastymin
 local xmin = 0
-for _, staff in pairs(stafforder) do
+for i, staff in pairs(stafforder) do
 	local extent = extents[staff]
 	if xmin > extent.xmin then
 		xmin = extent.xmin
@@ -686,6 +685,14 @@ for _, staff in pairs(stafforder) do
 
 	if xmax < extent.xmax then
 		xmax = extent.xmax
+	end
+
+	if i == 1 then
+		firstymin = yoff + extent.ymin
+	end
+
+	if i == #stafforder then
+		lastymin = yoff - extent.ymin
 	end
 
 	extent.yoff = yoff
@@ -713,10 +720,8 @@ for _, staff in ipairs(stafforder) do
 end
 
 -- draw barlines
-print(#extra3)
-for _, item in ipairs(extra3) do
+for staff, item in ipairs(extra3) do
 	if item.kind == 'barline' then
-		print(item.x, 0, item.x, yoff + 4*em)
-		draw_line(1, item.x, 0, item.x, yoff + 4*em)
+		draw_line(1, item.x, -firstymin, item.x, lastymin + 4*em)
 	end
 end
