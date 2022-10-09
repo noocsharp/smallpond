@@ -699,6 +699,16 @@ for i, staff in pairs(stafforder) do
 	yoff = yoff + extent.ymax - extent.ymin
 end
 
+for staff, item in ipairs(extra3) do
+	if item.kind == 'barline' then
+		if item.x < xmin then
+			xmin = item.x
+		elseif item.x > xmax then
+			xmax = item.x
+		end
+	end
+end
+
 create_surface(xmax - xmin, yoff)
 
 for _, staff in ipairs(stafforder) do
