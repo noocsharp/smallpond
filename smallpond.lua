@@ -547,11 +547,15 @@ while true do
 		elseif el.kind == "srest" then
 			xdiffs[staff] = 0
 		elseif el.kind == "beam" then
-			local m = (el.notes[#el.notes-1].stemy - el.notes[1].stemy) / (el.notes[#el.notes-1].stemx - el.notes[1].stemx)
+			local m = (el.notes[#el.notes].stemy - el.notes[1].stemy) / (el.notes[#el.notes].stemx - el.notes[1].stemx)
+			local x0 = el.notes[1].stemx
+			local y0 = el.notes[1].stemy
 			for i, n in ipairs(el.pattern) do
 				if i == 1 then goto continue end
+				local x1 = el.notes[i-1].stemx
+				local x2 = el.notes[i].stemx
 				for yoff=0, 7*(n-1), 7 do
-					table.insert(staff3[staff], {kind="quad", x1=el.notes[i-1].stemx - 0.5, y1=el.notes[i-1].stemy + yoff, x2=el.notes[i].stemx, y2=el.notes[i].stemy + yoff, x3=el.notes[i].stemx, y3=el.notes[i].stemy + 5 + yoff, x4=el.notes[i-1].stemx - 0.5, y4=el.notes[i-1].stemy + 5 + yoff})
+					table.insert(staff3[staff], {kind="quad", x1=x1 - 0.5, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, x3=x2, y3=y0 + m*(x2 - x0) + 5 + yoff, x4=x1 - 0.5, y4=y0 + m*(x1 - x0) + 5 + yoff})
 				end
 				::continue::
 			end
