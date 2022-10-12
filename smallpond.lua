@@ -327,7 +327,7 @@ function trybeam(staff, tobeam, beampattern)
 			note.stemdir = stemdir
 			table.insert(staff, note)
 		end
-		table.insert(staff, {kind='beam', notes=tobeam, pattern=beampattern})
+		table.insert(staff, {kind='beam', notes=tobeam, pattern=beampattern, stemdir=stemdir, maxbeams=math.max(table.unpack(beampattern))})
 	elseif #tobeam == 1 then
 		tobeam[1].beamed = false
 		table.insert(staff, tobeam[1])
@@ -558,7 +558,18 @@ while true do
 				local x1 = el.notes[i-1].stemx
 				local x2 = el.notes[i].stemx
 				el.notes[i].stem.y2 = y0 + m*(x2 - x0)
-				for yoff=0, 7*(n-1), 7 do
+
+				local first, last, inc
+				if el.stemdir == 1 then
+					first = 7*(el.maxbeams - 2)
+					last = 7*(el.maxbeams - n - 1)
+					inc = -7
+				else
+					first = 0
+					last = 7*(n-1)
+					inc = 7
+				end
+				for yoff=first, last, inc do
 					table.insert(staff3[staff], {kind="quad", x1=x1 - 0.5, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, x3=x2, y3=y0 + m*(x2 - x0) + 5 + yoff, x4=x1 - 0.5, y4=y0 + m*(x1 - x0) + 5 + yoff})
 				end
 				::continue::
