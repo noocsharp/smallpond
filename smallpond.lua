@@ -523,11 +523,15 @@ while true do
 					-- advance width for bravura is 1.18 - .1 for stem width
 					el.stemx = w + rx - 1.08 + preoffset
 					el.stemy = lowheight -.168*em - el.stemlen*em
-					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em})
+					local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em}
+					el.stem = stem
+					table.insert(staff3[staff], el.stem)
 				else
 					el.stemx = rx + .5 + preoffset
 					el.stemy = lowheight + el.stemlen*em
-					table.insert(staff3[staff], {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=lowheight + el.stemlen*em})
+					local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=lowheight + el.stemlen*em}
+					el.stem = stem
+					table.insert(staff3[staff], stem)
 				end
 			end
 
@@ -554,6 +558,7 @@ while true do
 				if i == 1 then goto continue end
 				local x1 = el.notes[i-1].stemx
 				local x2 = el.notes[i].stemx
+				el.notes[i].stem.y2 = y0 + m*(x2 - x0)
 				for yoff=0, 7*(n-1), 7 do
 					table.insert(staff3[staff], {kind="quad", x1=x1 - 0.5, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, x3=x2, y3=y0 + m*(x2 - x0) + 5 + yoff, x4=x1 - 0.5, y4=y0 + m*(x1 - x0) + 5 + yoff})
 				end
