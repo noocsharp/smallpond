@@ -553,18 +553,22 @@ while true do
 			local m = (el.notes[#el.notes].stemy - el.notes[1].stemy) / (el.notes[#el.notes].stemx - el.notes[1].stemx)
 			local x0 = el.notes[1].stemx
 			local y0 = el.notes[1].stemy
+			if el.stemdir == 1 then
+				el.notes[1].stem.y2 = y0 + 7*(el.maxbeams - 2) + 5
+			end
 			for i, n in ipairs(el.pattern) do
 				if i == 1 then goto continue end
 				local x1 = el.notes[i-1].stemx
 				local x2 = el.notes[i].stemx
-				el.notes[i].stem.y2 = y0 + m*(x2 - x0)
 
 				local first, last, inc
 				if el.stemdir == 1 then
 					first = 7*(el.maxbeams - 2)
 					last = 7*(el.maxbeams - n - 1)
+					el.notes[i].stem.y2 = y0 + m*(x2 - x0) + 7*(el.maxbeams - 2) + 5
 					inc = -7
 				else
+					el.notes[i].stem.y2 = y0 + m*(x2 - x0)
 					first = 0
 					last = 7*(n-1)
 					inc = 7
