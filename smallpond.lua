@@ -175,7 +175,6 @@ local commands = {
 				i, out = parsenotecolumn(text, i)
 				group.count = out.count
 				group.stemdir = out.stemdir
-				group.stemdir = out.stemdir
 				group.beam = out.beam
 				table.insert(voice, group)
 				goto start
@@ -247,7 +246,7 @@ local staff1 = {}
 local curname
 local inbeam = 0
 -- first-order placement
-abstract_dispatch = {
+local dispatch1 = {
 	newnotegroup = function(data)
 		local heads = {}
 		local beamcount = math.log(data.count) / math.log(2) - 2
@@ -300,7 +299,7 @@ abstract_dispatch = {
 for _, voice in ipairs(voices) do
 	time = 0
 	for _, item in ipairs(voice) do
-		assert(abstract_dispatch[item.command])(item)
+		assert(dispatch1[item.command])(item)
 	end
 end
 
