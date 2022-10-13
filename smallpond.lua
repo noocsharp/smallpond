@@ -534,7 +534,7 @@ while true do
 				end
 			end
 
-			if el.length == 8 and not el.beamed then
+			if el.length == 8 and el.beamed == 0 then
 				if el.stemdir == 1 then
 					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=preoffset + rx, y=lowheight + 3.5*em})
 				else
