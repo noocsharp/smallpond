@@ -568,9 +568,12 @@ for _, time in ipairs(points) do
 
 	for staff, vals in pairs(todraw) do
 		if #vals.on == 0 then goto nextstaff end
-		local el = vals.on[1]
-		local diff = staff3ify(el, staff)
-		if el.beamref then staff3ify(el.beamref, staff) end
+		local diff
+		print(#vals.on)
+		for _, el in ipairs(vals.on) do
+			diff = staff3ify(el, staff)
+			if el.beamref then staff3ify(el.beamref, staff) end
+		end
 		if xdiff < diff then xdiff = diff end
 		::nextstaff::
 	end
