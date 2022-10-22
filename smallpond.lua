@@ -243,6 +243,9 @@ local octave = 0
 local clef = Clef.treble
 local lastnote = nil
 local staff1 = {}
+local points = {}
+local pointthere = {}
+local timings = {}
 local curname
 local inbeam = 0
 -- first-order placement
@@ -268,12 +271,15 @@ local dispatch1 = {
 			note.beamed = inbeam
 		end
 		table.insert(staff1[curname], note)
+		table.insert(timings[time][curname].on, note)
 		lastnote = note
 		time = time + 1 / data.count
 	end,
 	changeclef = function(data)
 		local class = assert(Clef[data.kind])
-		table.insert(staff1[curname], {kind="clef", class=class})
+		local clefitem = {kind="clef", class=class}
+		timings[time][curname].clef = clefitem
+		table.insert(staff1[curname], clefitem)
 		clef = class
 		octave = class.defoctave
 	end,
@@ -284,7 +290,9 @@ local dispatch1 = {
 		curname = data.name
 	end,
 	changetime = function(data)
-		table.insert(staff1[curname], {kind="time", num=data.num, denom=data.denom})
+		local timesig = {kind="time", num=data.num, denom=data.denom}
+		timings[time][curname].timesig = timesig
+		table.insert(staff1[curname], timesig)
 	end,
 	barline = function(data)
 		table.insert(staff1[curname], {kind="barline"})
@@ -299,14 +307,23 @@ local dispatch1 = {
 for _, voice in ipairs(voices) do
 	time = 0
 	for _, item in ipairs(voice) do
+		if not pointthere[time] then
+			pointthere[time] = true
+			table.insert(points, time)
+			timings[time] = {}
+		end
+		if curname and not timings[time][curname] then timings[time][curname] = {pre={}, on={}, post={}} end
 		assert(dispatch1[item.command])(item)
 	end
 end
 
+table.sort(points)
+
 -- second-order placement
 local staff2 = {}
 
-function trybeam(staff, tobeam, beampattern)
+function trybeam(staffname, tobeam, beampattern)
+	local staff = staff2[staffname]
 	if #tobeam > 1 then
 		-- check which way the stem should point on all the notes in the beam
 		local ysum = 0
@@ -327,7 +344,9 @@ function trybeam(staff, tobeam, beampattern)
 			note.stemdir = stemdir
 			table.insert(staff, note)
 		end
-		table.insert(staff, {kind='beam', notes=tobeam, pattern=beampattern, stemdir=stemdir, maxbeams=math.max(table.unpack(beampattern))})
+		local beam = {kind='beam', notes=tobeam, pattern=beampattern, stemdir=stemdir, maxbeams=math.max(table.unpack(beampattern))}
+		table.insert(staff, beam)
+		tobeam[#tobeam].beamref = beam
 	elseif #tobeam == 1 then
 		tobeam[1].beamed = false
 		table.insert(staff, tobeam[1])
@@ -346,7 +365,7 @@ for name, staff in pairs(staff1) do
 			elseif el.beamed == -1 then
 				tobeam[#tobeam + 1] = el
 				beampattern[#beampattern + 1] = el.beamcount
-				trybeam(staff2[name], tobeam, beampattern)
+				trybeam(name, tobeam, beampattern)
 				tobeam = {}
 				beampattern = {}
 			else
@@ -356,12 +375,11 @@ for name, staff in pairs(staff1) do
 			table.insert(staff2[name], el)
 		end
 	end
-	trybeam(staff2[name], tobeam, beampattern)
+	trybeam(name, tobeam, beampattern)
 	tobeam = {}
 	beampattern = {}
 end
 
-local staffindex = {}
 local staff3 = {}
 local extra3 = {}
 
@@ -369,235 +387,190 @@ local x = 10
 local lasttime = 0
 
 for staff, _ in pairs(staff2) do
-	staffindex[staff] = 1
 	staff3[staff] = {}
 end
 
-while true do
-	local todraw = {}
-	-- draw untimed elements before timed elements
-	-- we assume that staff2 contains lists sorted by time
-	local lowesttime
-	local timed = true
-	local empty = true
-	local barline = true
-	for name, i in pairs(staffindex) do
-		if not staff2[name][i] then
-			goto continue
+local staff3ify = function(el, staff)
+	local xdiff
+	if el.kind == "notecolumn" then
+		local rx = x
+		xdiff = 10
+		rx = rx + xdiff
+
+		local glyph
+		if el.length == 1 then
+			glyph = Glyph["noteheadWhole"]
+		elseif el.length == 2 then
+			glyph = Glyph["noteheadHalf"]
+		elseif el.length >= 4 then
+			glyph = Glyph["noteheadBlack"]
 		end
 
-		if timed then
-			if staff2[name][i].time then
-				if not lowesttime then
-					lowesttime = staff2[name][i].time
-				end
+		local w, h = glyph_extents(glyph)
 
-				if lowesttime > staff2[name][i].time then
-					lowesttime = staff2[name][i].time
-					todraw = {[name] = i}
-					print("inserted first timed element", staff2[name][i].kind, staff2[name][i].time, name)
-					goto continue
-				end
+		local preoffset = 0
+		for _, head in ipairs(el.heads) do
+			if #head.acc then
+				preoffset = 10
+			end
+		end
 
-				if lowesttime < staff2[name][i].time then
-					goto continue
-				end
+		local heightsum = 0
+		local lowheight
+		local highheight
+		for _, head in ipairs(el.heads) do
+			heightsum = heightsum + head.y
+			local ry = (em*head.y) / 2 + 2*em
+			if not lowheight then lowheight = ry end
+			if not highheight then highheight = ry end
+			table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=preoffset + rx, y=ry})
+			if head.acc == "s" then
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
+			elseif head.acc == "f" then
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry})
+			elseif head.acc == "n" then
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
+			end
 
-				empty = false
-				barline = false
-				todraw[name] = i
-				print("inserted timed element", staff2[name][i].kind, staff2[name][i].time, name)
+			lowheight = math.min(lowheight, ry)
+			highheight = math.max(highheight, ry)
+
+			-- TODO: only do this once per column
+			-- leger lines
+			if head.y <= -6 then
+				for j = -6, head.y, -2 do
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2})
+				end
+			end
+
+			if head.y >= 6 then
+				for j = 6, head.y, 2 do
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2})
+				end
+			end
+		end
+
+		if not el.stemdir and el.length > 1 then
+			if heightsum <= 0 then
+				el.stemdir = 1
 			else
-				todraw = {[name] = i}
-				timed = false
-				empty = false
-				if staff2[name][i].kind ~= 'barline' then
-					barline = false
-				end
-				print("inserted first untimed element", staff2[name][i].kind, name)
-			end
-		else
-			if not staff2[name][i].time then
-				todraw[name] = i
-				if staff2[name][i].kind ~= 'barline' then
-					barline = false
-				end
-				print("inserted untimed element", staff2[name][i].kind, name)
+				el.stemdir = -1
 			end
 		end
 
-		::continue::
-	end
-
-	if empty then break end
-
-	-- special case barline since it goes across staves
-	-- (handle it after extents are calculated)
-	-- FIXME: there's a more efficient way to do this
-	if barline then
-		x = x + 20
-		table.insert(extra3, {kind="barline", x=x})
-		x = x + 15
-	else
-		for staff, index in pairs(todraw) do
-			if staff2[staff][index].kind == 'barline' then
-				todraw[staff] = nil
+		-- stem
+		if el.stemdir then
+			if el.stemdir == -1 then
+				-- stem up
+				-- advance width for bravura is 1.18 - .1 for stem width
+				el.stemx = w + rx - 1.08 + preoffset
+				el.stemy = lowheight -.168*em - el.stemlen*em
+				local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em}
+				el.stem = stem
+				table.insert(staff3[staff], el.stem)
+			else
+				el.stemx = rx + .5 + preoffset
+				el.stemy = lowheight + el.stemlen*em
+				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=lowheight + el.stemlen*em}
+				el.stem = stem
+				table.insert(staff3[staff], stem)
 			end
 		end
-	end
 
-	local xdiffs = {}
-	for staff, index in pairs(todraw) do
-		el = staff2[staff][index]
-		if el.kind == "notecolumn" then
-			local rx = x
-			local xdiff = 10
-			rx = rx + xdiff
-
-			local glyph
-			if el.length == 1 then
-				glyph = Glyph["noteheadWhole"]
-			elseif el.length == 2 then
-				glyph = Glyph["noteheadHalf"]
-			elseif el.length >= 4 then
-				glyph = Glyph["noteheadBlack"]
-			end
-
-			local w, h = glyph_extents(glyph)
-
-			local preoffset = 0
-			for _, head in ipairs(el.heads) do
-				if #head.acc then
-					preoffset = 10
-				end
-			end
-
-			local heightsum = 0
-			local lowheight
-			local highheight
-			for _, head in ipairs(el.heads) do
-				heightsum = heightsum + head.y
-				local ry = (em*head.y) / 2 + 2*em
-				if not lowheight then lowheight = ry end
-				if not highheight then highheight = ry end
-				table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=preoffset + rx, y=ry})
-				if head.acc == "s" then
-					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
-				elseif head.acc == "f" then
-					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry})
-				elseif head.acc == "n" then
-					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
-				end
-
-				lowheight = math.min(lowheight, ry)
-				highheight = math.max(highheight, ry)
-
-				-- TODO: only do this once per column
-				-- leger lines
-				if head.y <= -6 then
-					for j = -6, head.y, -2 do
-						table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2})
-					end
-				end
-
-				if head.y >= 6 then
-					for j = 6, head.y, 2 do
-						table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2})
-					end
-				end
-			end
-
-			if not el.stemdir and el.length > 1 then
-				if heightsum <= 0 then
-					el.stemdir = 1
-				else
-					el.stemdir = -1
-				end
-			end
-
-			-- stem
-			if el.stemdir then
-				if el.stemdir == -1 then
-					-- stem up
-					-- advance width for bravura is 1.18 - .1 for stem width
-					el.stemx = w + rx - 1.08 + preoffset
-					el.stemy = lowheight -.168*em - el.stemlen*em
-					local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em}
-					el.stem = stem
-					table.insert(staff3[staff], el.stem)
-				else
-					el.stemx = rx + .5 + preoffset
-					el.stemy = lowheight + el.stemlen*em
-					local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=lowheight + el.stemlen*em}
-					el.stem = stem
-					table.insert(staff3[staff], stem)
-				end
-			end
-
-			if el.length == 8 and el.beamed == 0 then
-				if el.stemdir == 1 then
-					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=preoffset + rx, y=lowheight + 3.5*em})
-				else
-					-- TODO: move glyph extents to a precalculated table or something
-					local fx, fy = glyph_extents(Glyph["flag8thUp"])
-					table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=lowheight -.168*em - 3.5*em})
-					xdiff = xdiff + fx
-				end
-			end
-			xdiff = xdiff + 100 / el.length + 10
-			xdiffs[staff] = xdiff
-			lasttime = el.time
-		elseif el.kind == "srest" then
-			xdiffs[staff] = 0
-		elseif el.kind == "beam" then
-			local m = (el.notes[#el.notes].stemy - el.notes[1].stemy) / (el.notes[#el.notes].stemx - el.notes[1].stemx)
-			local x0 = el.notes[1].stemx
-			local y0 = el.notes[1].stemy
+		if el.length == 8 and el.beamed == 0 then
 			if el.stemdir == 1 then
-				el.notes[1].stem.y2 = y0 + 7*(el.maxbeams - 2) + 5
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=preoffset + rx, y=lowheight + 3.5*em})
+			else
+				-- TODO: move glyph extents to a precalculated table or something
+				local fx, fy = glyph_extents(Glyph["flag8thUp"])
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=lowheight -.168*em - 3.5*em})
+				xdiff = xdiff + fx
 			end
-			for i, n in ipairs(el.pattern) do
-				if i == 1 then goto continue end
-				local x1 = el.notes[i-1].stemx
-				local x2 = el.notes[i].stemx
-
-				local first, last, inc
-				if el.stemdir == 1 then
-					first = 7*(el.maxbeams - 2)
-					last = 7*(el.maxbeams - n - 1)
-					el.notes[i].stem.y2 = y0 + m*(x2 - x0) + 7*(el.maxbeams - 2) + 5
-					inc = -7
-				else
-					el.notes[i].stem.y2 = y0 + m*(x2 - x0)
-					first = 0
-					last = 7*(n-1)
-					inc = 7
-				end
-				for yoff=first, last, inc do
-					table.insert(staff3[staff], {kind="quad", x1=x1 - 0.5, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, x3=x2, y3=y0 + m*(x2 - x0) + 5 + yoff, x4=x1 - 0.5, y4=y0 + m*(x1 - x0) + 5 + yoff})
-				end
-				::continue::
-			end
-		elseif el.kind == "clef" then
-			table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff})
-			xdiffs[staff] =  30
-		elseif el.kind == "time" then
-			-- TODO: draw multidigit time signatures properly
-			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=x, y=em})
-			table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=x, y=3*em})
-			xdiffs[staff] =  30
 		end
+		xdiff = xdiff + 100 / el.length + 10
+		xdiff = xdiff
+		lasttime = el.time
+	elseif el.kind == "srest" then
+		xdiff = 0
+	elseif el.kind == "beam" then
+		local m = (el.notes[#el.notes].stemy - el.notes[1].stemy) / (el.notes[#el.notes].stemx - el.notes[1].stemx)
+		local x0 = el.notes[1].stemx
+		local y0 = el.notes[1].stemy
+		if el.stemdir == 1 then
+			el.notes[1].stem.y2 = y0 + 7*(el.maxbeams - 2) + 5
+		end
+		for i, n in ipairs(el.pattern) do
+			if i == 1 then goto continue end
+			local x1 = el.notes[i-1].stemx
+			local x2 = el.notes[i].stemx
 
-		staffindex[staff] = staffindex[staff] + 1
+			local first, last, inc
+			if el.stemdir == 1 then
+				first = 7*(el.maxbeams - 2)
+				last = 7*(el.maxbeams - n - 1)
+				el.notes[i].stem.y2 = y0 + m*(x2 - x0) + 7*(el.maxbeams - 2) + 5
+				inc = -7
+			else
+				el.notes[i].stem.y2 = y0 + m*(x2 - x0)
+				first = 0
+				last = 7*(n-1)
+				inc = 7
+			end
+			for yoff=first, last, inc do
+				table.insert(staff3[staff], {kind="quad", x1=x1 - 0.5, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, x3=x2, y3=y0 + m*(x2 - x0) + 5 + yoff, x4=x1 - 0.5, y4=y0 + m*(x1 - x0) + 5 + yoff})
+			end
+			::continue::
+		end
+	elseif el.kind == "clef" then
+		table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff})
+		xdiff =  30
+	elseif el.kind == "time" then
+		-- TODO: draw multidigit time signatures properly
+		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=x, y=em})
+		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=x, y=3*em})
+		xdiff =  30
 	end
 
-	local maxdiff = 0
-	for _, xd in pairs(xdiffs) do
-		maxdiff = math.max(maxdiff, xd)
+	return xdiff
+end
+
+for _, time in ipairs(points) do
+	local todraw = timings[time]
+
+	-- clef
+	local xdiff = 0
+	for staff, vals in pairs(todraw) do
+		if vals.clef then
+				local diff = staff3ify(vals.clef, staff)
+				if diff > xdiff then xdiff = diff end
+		end
 	end
 
-	x = x + maxdiff
+	x = x + xdiff
+	xdiff = 0
 
+	-- time signature
+	local xdiff = 0
+	for staff, vals in pairs(todraw) do
+		if vals.timesig then
+				local diff = staff3ify(vals.timesig, staff)
+				if diff > xdiff then xdiff = diff end
+		end
+	end
+
+	x = x + xdiff
+	xdiff = 0
+
+	for staff, vals in pairs(todraw) do
+		if #vals.on == 0 then goto nextstaff end
+		local el = vals.on[1]
+		local diff = staff3ify(el, staff)
+		if el.beamref then staff3ify(el.beamref, staff) end
+		if xdiff < diff then xdiff = diff end
+		::nextstaff::
+	end
+
+	x = x + xdiff
 end
 
 -- calculate extents
