@@ -186,7 +186,7 @@ local commands = {
 			if note.command == 'srest' then
 				table.insert(voice, {command='srest', count=col.count})
 			else
-				table.insert(voice, {command="newnotegroup", count=col.count, beam=col.beam, notes={[1] = note}})
+				table.insert(voice, {command="newnotegroup", count=col.count, stemdir=col.stemdir, beam=col.beam, notes={[1] = note}})
 			end
 		end
 
@@ -255,10 +255,10 @@ local dispatch1 = {
 		local beamcount = math.log(data.count) / math.log(2) - 2
 		for _, note in ipairs(data.notes) do
 			octave = octave - note.shift
-			table.insert(heads, {acc=note.acc, stemdir=note.stemdir, y=clef.place(note.note, octave)})
+			table.insert(heads, {acc=note.acc, y=clef.place(note.note, octave)})
 		end
 
-		local note = {kind="notecolumn", beamcount=beamcount, stemlen=3.5, length=data.count, time=time, heads=heads}
+		local note = {kind="notecolumn", beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, length=data.count, time=time, heads=heads}
 		if data.beam == 1 then
 			assert(inbeam == 0)
 			inbeam = 1
@@ -569,7 +569,6 @@ for _, time in ipairs(points) do
 	for staff, vals in pairs(todraw) do
 		if #vals.on == 0 then goto nextstaff end
 		local diff
-		print(#vals.on)
 		for _, el in ipairs(vals.on) do
 			diff = staff3ify(el, staff)
 			if el.beamref then staff3ify(el.beamref, staff) end
