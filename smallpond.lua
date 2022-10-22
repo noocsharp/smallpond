@@ -472,7 +472,7 @@ local staff3ify = function(el, staff)
 			else
 				el.stemx = rx + .5 + preoffset
 				el.stemy = lowheight + el.stemlen*em
-				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=lowheight + el.stemlen*em}
+				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=highheight + el.stemlen*em}
 				el.stem = stem
 				table.insert(staff3[staff], stem)
 			end
@@ -480,7 +480,8 @@ local staff3ify = function(el, staff)
 
 		if el.length == 8 and el.beamed == 0 then
 			if el.stemdir == 1 then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=preoffset + rx, y=lowheight + 3.5*em})
+				local fx, fy = glyph_extents(Glyph["flag8thDown"])
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=preoffset + rx, y=highheight + 3.5*em})
 			else
 				-- TODO: move glyph extents to a precalculated table or something
 				local fx, fy = glyph_extents(Glyph["flag8thUp"])
