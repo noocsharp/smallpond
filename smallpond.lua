@@ -271,14 +271,14 @@ local dispatch1 = {
 			note.beamed = inbeam
 		end
 		table.insert(staff1[curname], note)
-		table.insert(timings[time][curname].on, note)
+		table.insert(timings[time].staffs[curname].on, note)
 		lastnote = note
 		time = time + 1 / data.count
 	end,
 	changeclef = function(data)
 		local class = assert(Clef[data.kind])
 		local clefitem = {kind="clef", class=class}
-		timings[time][curname].clef = clefitem
+		timings[time].staffs[curname].clef = clefitem
 		table.insert(staff1[curname], clefitem)
 		clef = class
 		octave = class.defoctave
@@ -291,11 +291,12 @@ local dispatch1 = {
 	end,
 	changetime = function(data)
 		local timesig = {kind="time", num=data.num, denom=data.denom}
-		timings[time][curname].timesig = timesig
+		timings[time].staffs[curname].timesig = timesig
 		table.insert(staff1[curname], timesig)
 	end,
 	barline = function(data)
 		table.insert(staff1[curname], {kind="barline"})
+		timings[time].barline = true
 		lastnote = nil
 	end,
 	srest = function(data)
@@ -310,9 +311,9 @@ for _, voice in ipairs(voices) do
 		if not pointthere[time] then
 			pointthere[time] = true
 			table.insert(points, time)
-			timings[time] = {}
+			timings[time] = {staffs={}}
 		end
-		if curname and not timings[time][curname] then timings[time][curname] = {pre={}, on={}, post={}} end
+		if curname and not timings[time].staffs[curname] then timings[time].staffs[curname] = {pre={}, on={}, post={}} end
 		assert(dispatch1[item.command])(item)
 	end
 end
@@ -488,7 +489,6 @@ local staff3ify = function(el, staff)
 			end
 		end
 		xdiff = xdiff + 100 / el.length + 10
-		xdiff = xdiff
 		lasttime = el.time
 	elseif el.kind == "srest" then
 		xdiff = 0
@@ -535,7 +535,7 @@ local staff3ify = function(el, staff)
 end
 
 for _, time in ipairs(points) do
-	local todraw = timings[time]
+	local todraw = timings[time].staffs
 
 	-- clef
 	local xdiff = 0
@@ -560,6 +560,11 @@ for _, time in ipairs(points) do
 
 	x = x + xdiff
 	xdiff = 0
+
+	if timings[time].barline then
+		table.insert(extra3, {kind='barline', x=x+25})
+		x = x + 10
+	end
 
 	for staff, vals in pairs(todraw) do
 		if #vals.on == 0 then goto nextstaff end
