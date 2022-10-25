@@ -234,21 +234,24 @@ main(int argc, char *argv[])
 		fprintf(stderr, "couldn't make frame writeable\n");
 		return 1;
 	}
-	/* fill with white */
-	cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
-	cairo_rectangle(cr, 0, 0, 854, 480);
-	cairo_fill(cr);
+
 	if (luaL_dofile(L, "smallpond.lua")) {
 		fprintf(stderr, "lua error: %s\n", lua_tostring(L, -1));
 		return 1;
 	}
 
-	cairo_surface_flush(surface);
-	uint8_t *image_data = cairo_image_surface_get_data(surface);
-
-	cairo_surface_write_to_png(surface, "out.png");
-
 	for (int i = 0; i < 30; i++) {
+		/* fill with white */
+		cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+		cairo_rectangle(cr, 0, 0, 854, 480);
+		cairo_fill(cr);
+		// draw frame
+		lua_getglobal(L, "drawframe");
+		lua_pushnumber(L, i);
+		lua_call(L, 1, 0);
+
+		cairo_surface_flush(surface);
+		uint8_t *image_data = cairo_image_surface_get_data(surface);
 		if (av_frame_make_writable(frame) < 0) {
 			fprintf(stderr, "couldn't make frame writeable\n");
 			return 1;

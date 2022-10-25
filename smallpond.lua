@@ -713,29 +713,33 @@ for staff, item in ipairs(extra3) do
 	end
 end
 
-create_surface(xmax - xmin, yoff)
+local height = yoff
+local width = xmax - xmin
 
-for _, staff in ipairs(stafforder) do
-	local extent = extents[staff]
-	for i, d in ipairs(staff3[staff]) do
-		if d.kind == "glyph" then
-			draw_glyph(d.glyph, d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
-		elseif d.kind == "line" then
-			draw_line(d.t, d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff)
-		elseif d.kind == "quad" then
-			draw_quad(d.t, d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff, d.x3 - extent.xmin, d.y3 - extent.ymin + extent.yoff, d.x4 - extent.xmin, d.y4 - extent.ymin + extent.yoff)
+function drawframe(time)
+	local toff = -time * 10
+	for _, staff in ipairs(stafforder) do
+		local extent = extents[staff]
+		for i, d in ipairs(staff3[staff]) do
+			if d.kind == "glyph" then
+				draw_glyph(d.glyph, toff + d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
+			elseif d.kind == "line" then
+				draw_line(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff)
+			elseif d.kind == "quad" then
+				draw_quad(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff, toff + d.x3 - extent.xmin, d.y3 - extent.ymin + extent.yoff, toff + d.x4 - extent.xmin, d.y4 - extent.ymin + extent.yoff)
+			end
+		end
+
+		-- draw staff
+		for y=0,em*4,em do
+			draw_line(1, toff + xmin, y + extent.yoff - extent.ymin, toff + xmax, y + extent.yoff - extent.ymin)
 		end
 	end
 
-	-- draw staff
-	for y=0,em*4,em do
-		draw_line(1, xmin, y + extent.yoff - extent.ymin, xmax, y + extent.yoff - extent.ymin)
-	end
-end
-
--- draw barlines
-for staff, item in ipairs(extra3) do
-	if item.kind == 'barline' then
-		draw_line(1, item.x, -firstymin, item.x, lastymin + 4*em)
+	-- draw barlines
+	for staff, item in ipairs(extra3) do
+		if item.kind == 'barline' then
+			draw_line(1, toff + item.x, -firstymin, toff + item.x, lastymin + 4*em)
+		end
 	end
 end
