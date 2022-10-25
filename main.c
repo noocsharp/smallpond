@@ -200,11 +200,8 @@ main(int argc, char *argv[])
 	}
 
 	// suggested bitrates: https://www.videoproc.com/media-converter/bitrate-setting-for-h264.htm
-	// 720 x 480: 1800 kbps
-	// 1280 x 720: 3500 kbps
-	// 1920 x 1080: 8500 kbps
-	c->bit_rate = 1800*1000;
-	c->width = 720;
+	c->bit_rate = 2500*1000;
+	c->width = 854;
 	c->height = 480;
 	c->time_base.num = 1;
 	c->time_base.den = 30;
@@ -228,7 +225,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, 720, 480);
+	surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, 854, 480);
 	cr = cairo_create(surface);
 
 	cairo_set_font_face(cr, cface);
@@ -239,31 +236,34 @@ main(int argc, char *argv[])
 	}
 	/* fill with white */
 	cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
-	cairo_rectangle(cr, 0, 0, 720, 480);
+	cairo_rectangle(cr, 0, 0, 854, 480);
 	cairo_fill(cr);
 	if (luaL_dofile(L, "smallpond.lua")) {
 		fprintf(stderr, "lua error: %s\n", lua_tostring(L, -1));
 		return 1;
 	}
 
-	unsigned char *image_data = cairo_image_surface_get_data(surface);
+	cairo_surface_flush(surface);
+	uint8_t *image_data = cairo_image_surface_get_data(surface);
 
-	printf("avframe line size: %d\n", frame->linesize[0]);
+	cairo_surface_write_to_png(surface, "out.png");
+
 	for (int i = 0; i < 30; i++) {
 		if (av_frame_make_writable(frame) < 0) {
 			fprintf(stderr, "couldn't make frame writeable\n");
 			return 1;
 		}
 
-		for (int x = 0; x < 720; x++) {
-			for (int y = 0; y < 480; y++) {
-				int srcoffset = cairo_format_stride_for_width(CAIRO_FORMAT_RGB24, 720) * y + x;
-				uint32_t val = ((uint32_t *)image_data)[srcoffset];
+		for (int y = 0; y < 480; y++) {
+			for (int x = 0; x < 854; x++) {
+				int srcoffset = cairo_image_surface_get_stride(surface) * y + 4*x;
+				uint32_t val = *(uint32_t *)(image_data + srcoffset);
 				// we are assuming RGB24 here
 				int offset = y * frame->linesize[0] + 3*x;
-				frame->data[0][offset + 2] = (val >> 16) & 0xFF;
+
+				frame->data[0][offset] = (val >> 16) & 0xFF;
 				frame->data[0][offset + 1] = (val >> 8) & 0xFF;
-				frame->data[0][offset] = val & 0xFF;
+				frame->data[0][offset + 2] = val & 0xFF;
 			}
 		}
 
