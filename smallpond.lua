@@ -713,11 +713,12 @@ for staff, item in ipairs(extra3) do
 	end
 end
 
-local height = yoff
-local width = xmax - xmin
-
 function drawframe(time)
 	local toff = -time * 10
+	print(framewidth - toff, xmax)
+	if -toff > xmax then
+		return true
+	end
 	for _, staff in ipairs(stafforder) do
 		local extent = extents[staff]
 		for i, d in ipairs(staff3[staff]) do
@@ -742,4 +743,6 @@ function drawframe(time)
 			draw_line(1, toff + item.x, -firstymin, toff + item.x, lastymin + 4*em)
 		end
 	end
+
+	return false
 end

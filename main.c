@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -148,6 +149,8 @@ main(int argc, char *argv[])
 	lua_setglobal(L, "draw_quad");
 	lua_pushcfunction(L, glyph_extents);
 	lua_setglobal(L, "glyph_extents");
+	lua_pushnumber(L, 854);
+	lua_setglobal(L, "framewidth");
 	FT_Library library;
 	int error = FT_Init_FreeType(&library);
 
@@ -240,15 +243,19 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	for (int i = 0; i < 30; i++) {
+	bool done = false;
+	unsigned int count = 0;
+	while (!done) {
 		/* fill with white */
 		cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
 		cairo_rectangle(cr, 0, 0, 854, 480);
 		cairo_fill(cr);
 		// draw frame
 		lua_getglobal(L, "drawframe");
-		lua_pushnumber(L, i);
-		lua_call(L, 1, 0);
+		lua_pushnumber(L, count);
+		lua_call(L, 1, 1);
+
+		done = lua_toboolean(L, -1);
 
 		cairo_surface_flush(surface);
 		uint8_t *image_data = cairo_image_surface_get_data(surface);
@@ -271,8 +278,9 @@ main(int argc, char *argv[])
 		}
 
 		fflush(stdout);
-		frame->pts = i;
+		frame->pts = count;
 		putframe(c, frame, pkt, output);
+		count++;
 	}
 
 	putframe(c, NULL, pkt, output);
