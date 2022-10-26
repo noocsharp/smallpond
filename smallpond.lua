@@ -391,7 +391,7 @@ for staff, _ in pairs(staff2) do
 	staff3[staff] = {}
 end
 
-local staff3ify = function(el, staff)
+local staff3ify = function(timing, el, staff)
 	local xdiff
 	if el.kind == "notecolumn" then
 		local rx = x
@@ -424,13 +424,13 @@ local staff3ify = function(el, staff)
 			local ry = (em*head.y) / 2 + 2*em
 			if not lowheight then lowheight = ry end
 			if not highheight then highheight = ry end
-			table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=preoffset + rx, y=ry})
+			table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=preoffset + rx, y=ry, time=timing})
 			if head.acc == "s" then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry})
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry, time=timing})
 			elseif head.acc == "f" then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry})
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry, time=timing})
 			elseif head.acc == "n" then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry})
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry, time=timing})
 			end
 
 			lowheight = math.min(lowheight, ry)
@@ -440,13 +440,13 @@ local staff3ify = function(el, staff)
 			-- leger lines
 			if head.y <= -6 then
 				for j = -6, head.y, -2 do
-					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2})
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2, time=timing})
 				end
 			end
 
 			if head.y >= 6 then
 				for j = 6, head.y, 2 do
-					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2})
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2, time=timing})
 				end
 			end
 		end
@@ -466,13 +466,13 @@ local staff3ify = function(el, staff)
 				-- advance width for bravura is 1.18 - .1 for stem width
 				el.stemx = w + rx - 1.08 + preoffset
 				el.stemy = lowheight -.168*em - el.stemlen*em
-				local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em}
+				local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em, time=timing}
 				el.stem = stem
 				table.insert(staff3[staff], el.stem)
 			else
 				el.stemx = rx + .5 + preoffset
 				el.stemy = lowheight + el.stemlen*em
-				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=highheight + el.stemlen*em}
+				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=highheight + el.stemlen*em, time=timing}
 				el.stem = stem
 				table.insert(staff3[staff], stem)
 			end
@@ -481,11 +481,11 @@ local staff3ify = function(el, staff)
 		if el.length == 8 and el.beamed == 0 then
 			if el.stemdir == 1 then
 				local fx, fy = glyph_extents(Glyph["flag8thDown"])
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=preoffset + rx, y=highheight + 3.5*em})
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=preoffset + rx, y=highheight + 3.5*em, time=timing})
 			else
 				-- TODO: move glyph extents to a precalculated table or something
 				local fx, fy = glyph_extents(Glyph["flag8thUp"])
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=lowheight -.168*em - 3.5*em})
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=lowheight -.168*em - 3.5*em, time=timing})
 				xdiff = xdiff + fx
 			end
 		end
@@ -518,17 +518,17 @@ local staff3ify = function(el, staff)
 				inc = 7
 			end
 			for yoff=first, last, inc do
-				table.insert(staff3[staff], {kind="quad", x1=x1 - 0.5, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, x3=x2, y3=y0 + m*(x2 - x0) + 5 + yoff, x4=x1 - 0.5, y4=y0 + m*(x1 - x0) + 5 + yoff})
+				table.insert(staff3[staff], {kind="quad", x1=x1 - 0.5, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, x3=x2, y3=y0 + m*(x2 - x0) + 5 + yoff, x4=x1 - 0.5, y4=y0 + m*(x1 - x0) + 5 + yoff, time=timing})
 			end
 			::continue::
 		end
 	elseif el.kind == "clef" then
-		table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff})
+		table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff, time=timing})
 		xdiff =  30
 	elseif el.kind == "time" then
 		-- TODO: draw multidigit time signatures properly
-		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=x, y=em})
-		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=x, y=3*em})
+		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=x, y=em, time=timing})
+		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=x, y=3*em, time=timing})
 		xdiff =  30
 	end
 
@@ -542,8 +542,8 @@ for _, time in ipairs(points) do
 	local xdiff = 0
 	for staff, vals in pairs(todraw) do
 		if vals.clef then
-				local diff = staff3ify(vals.clef, staff)
-				if diff > xdiff then xdiff = diff end
+			local diff = staff3ify(time, vals.clef, staff)
+			if diff > xdiff then xdiff = diff end
 		end
 	end
 
@@ -554,8 +554,8 @@ for _, time in ipairs(points) do
 	local xdiff = 0
 	for staff, vals in pairs(todraw) do
 		if vals.timesig then
-				local diff = staff3ify(vals.timesig, staff)
-				if diff > xdiff then xdiff = diff end
+			local diff = staff3ify(time, vals.timesig, staff)
+			if diff > xdiff then xdiff = diff end
 		end
 	end
 
@@ -571,8 +571,8 @@ for _, time in ipairs(points) do
 		if #vals.on == 0 then goto nextstaff end
 		local diff
 		for _, el in ipairs(vals.on) do
-			diff = staff3ify(el, staff)
-			if el.beamref then staff3ify(el.beamref, staff) end
+			diff = staff3ify(time, el, staff)
+			if el.beamref then staff3ify(time, el.beamref, staff) end
 		end
 		if xdiff < diff then xdiff = diff end
 		::nextstaff::
@@ -714,20 +714,22 @@ for staff, item in ipairs(extra3) do
 end
 
 function drawframe(time)
-	local toff = -time * 10
+	local toff = 0
 	print(framewidth - toff, xmax)
-	if -toff > xmax then
+	if time > 400 then
 		return true
 	end
 	for _, staff in ipairs(stafforder) do
 		local extent = extents[staff]
 		for i, d in ipairs(staff3[staff]) do
-			if d.kind == "glyph" then
-				draw_glyph(d.glyph, toff + d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
-			elseif d.kind == "line" then
-				draw_line(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff)
-			elseif d.kind == "quad" then
-				draw_quad(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff, toff + d.x3 - extent.xmin, d.y3 - extent.ymin + extent.yoff, toff + d.x4 - extent.xmin, d.y4 - extent.ymin + extent.yoff)
+			if d.time*30 < time then
+				if d.kind == "glyph" then
+					draw_glyph(d.glyph, toff + d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
+				elseif d.kind == "line" then
+					draw_line(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff)
+				elseif d.kind == "quad" then
+					draw_quad(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff, toff + d.x3 - extent.xmin, d.y3 - extent.ymin + extent.yoff, toff + d.x4 - extent.xmin, d.y4 - extent.ymin + extent.yoff)
+				end
 			end
 		end
 
