@@ -244,7 +244,8 @@ main(int argc, char *argv[])
 	}
 
 	bool done = false;
-	unsigned int count = 0;
+	double time = 0;
+	double framecount = 0;
 	while (!done) {
 		/* fill with white */
 		cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
@@ -252,7 +253,7 @@ main(int argc, char *argv[])
 		cairo_fill(cr);
 		// draw frame
 		lua_getglobal(L, "drawframe");
-		lua_pushnumber(L, count);
+		lua_pushnumber(L, time);
 		lua_call(L, 1, 1);
 
 		done = lua_toboolean(L, -1);
@@ -278,9 +279,10 @@ main(int argc, char *argv[])
 		}
 
 		fflush(stdout);
-		frame->pts = count;
+		frame->pts = framecount;
 		putframe(c, frame, pkt, output);
-		count++;
+		time += 0.00390625;
+		framecount += 1;
 	}
 
 	putframe(c, NULL, pkt, output);

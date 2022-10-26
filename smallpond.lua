@@ -716,13 +716,13 @@ end
 function drawframe(time)
 	local toff = 0
 	print(framewidth - toff, xmax)
-	if time > 400 then
+	if time > 4 then
 		return true
 	end
 	for _, staff in ipairs(stafforder) do
 		local extent = extents[staff]
 		for i, d in ipairs(staff3[staff]) do
-			if d.time*30 < time then
+			if d.time < time then
 				if d.kind == "glyph" then
 					draw_glyph(d.glyph, toff + d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
 				elseif d.kind == "line" then
