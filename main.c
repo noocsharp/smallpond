@@ -10,6 +10,7 @@
 #include <cairo.h>
 
 #include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 #include <libavutil/frame.h>
 
 #include <lua.h>
@@ -110,7 +111,7 @@ create_surface(lua_State *L)
 }
 
 int
-putframe(AVCodecContext *ctx, AVFrame *frame, AVPacket *pkt, FILE *out)
+putframe(AVFormatContext *fctx, const AVStream *st, AVCodecContext *ctx, AVFrame *frame, AVPacket *pkt)
 {
 	int ret;
 
@@ -129,10 +130,19 @@ putframe(AVCodecContext *ctx, AVFrame *frame, AVPacket *pkt, FILE *out)
 			exit(1);
 		}
 
-		fwrite(pkt->data, 1, pkt->size, out);
+		av_packet_rescale_ts(pkt, ctx->time_base, st->time_base);
+		pkt->stream_index = st->index;
+
+		ret = av_interleaved_write_frame(fctx, pkt);
+		if (ret < 0) {
+			fprintf(stderr, "failed to write video frame\n");
+			exit(1);
+		}
 		av_packet_unref(pkt);
 	}
 }
+
+#define FILENAME "out.mkv"
 
 int
 main(int argc, char *argv[])
@@ -172,12 +182,6 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	FILE *output = fopen("out.h264", "wb");
-	if (!output) {
-		fprintf(stderr, "couldn't open output\n");
-		return 1;
-	}
-
 	AVPacket *pkt = av_packet_alloc();
 	if (!pkt) {
 		fprintf(stderr, "couldn't allocate packet!\n");
@@ -190,11 +194,28 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
+	const AVOutputFormat *fmt = av_guess_format(NULL, FILENAME, NULL);
+	if (!fmt) {
+		fprintf(stderr, "unknown output format\n");
+		return 1;
+	}
+
+	AVFormatContext *fc = avformat_alloc_context();
+	if (!fc) {
+		fprintf(stderr, "couldn't allocate AVFormatContext\n");
+		return 1;
+	}
+
+	fc->oformat = fmt;
+
 	const AVCodec *codec = avcodec_find_encoder_by_name("libx264rgb");
 	if (!codec) {
 		fprintf(stderr, "couldn't find h264 codec!\n");
 		return 1;
 	}
+
+	AVStream *stream = avformat_new_stream(fc, NULL);
+	stream->id = fc->nb_streams-1;
 
 	AVCodecContext *c = avcodec_alloc_context3(codec);
 	if (!c) {
@@ -202,7 +223,11 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (fc->oformat->flags & AVFMT_GLOBALHEADER)
+		c->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
 	// suggested bitrates: https://www.videoproc.com/media-converter/bitrate-setting-for-h264.htm
+	c->codec_id = codec->id;
 	c->bit_rate = 2500*1000;
 	c->width = 854;
 	c->height = 480;
@@ -214,6 +239,7 @@ main(int argc, char *argv[])
 	c->gop_size = 30*3;
 	AVDictionary *opts = NULL;
 
+	stream->time_base = c->time_base;
 	frame->format = c->pix_fmt;
 	frame->width = c->width;
 	frame->height = c->height;
@@ -240,6 +266,23 @@ main(int argc, char *argv[])
 
 	if (luaL_dofile(L, "smallpond.lua")) {
 		fprintf(stderr, "lua error: %s\n", lua_tostring(L, -1));
+		return 1;
+	}
+
+	if (!(fmt->flags & AVFMT_NOFILE)) {
+		if (avio_open(&fc->pb, FILENAME, AVIO_FLAG_WRITE) < 0) {
+			fprintf(stderr, "failed to open output file\n");
+		}
+	}
+
+	if (avcodec_parameters_from_context(stream->codecpar, c) < 0) {
+		fprintf(stderr, "failed to copy stream parameters\n");
+		return 1;
+	}
+
+	int ret;
+	if ((ret = avformat_write_header(fc, NULL)) < 0) {
+		fprintf(stderr, "failed to write header: %s\n", av_err2str(ret));
 		return 1;
 	}
 
@@ -280,17 +323,19 @@ main(int argc, char *argv[])
 
 		fflush(stdout);
 		frame->pts = framecount;
-		putframe(c, frame, pkt, output);
+		putframe(fc, stream, c, frame, pkt);
 		time += 0.00390625;
 		framecount += 1;
 	}
 
-	putframe(c, NULL, pkt, output);
-	fclose(output);
+	av_write_trailer(fc);
 
 	avcodec_free_context(&c);
 	av_frame_free(&frame);
 	av_packet_free(&pkt);
+
+	avio_closep(&fc->pb);
+	avformat_free_context(fc);
 
 	cairo_destroy(cr);
 	cairo_surface_destroy(surface);
