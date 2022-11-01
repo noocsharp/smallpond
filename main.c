@@ -138,7 +138,17 @@ putframe(AVFormatContext *fctx, const AVStream *st, AVCodecContext *ctx, AVFrame
 			fprintf(stderr, "failed to write video frame\n");
 			exit(1);
 		}
-		av_packet_unref(pkt);
+	}
+}
+
+int
+putaudioframe(AVFormatContext *fctx, const AVStream *st, AVPacket *pkt)
+{
+	pkt->stream_index = st->index;
+	int ret = av_interleaved_write_frame(fctx, pkt);
+	if (ret < 0) {
+		fprintf(stderr, "failed to write video frame\n");
+		exit(1);
 	}
 }
 
@@ -194,6 +204,20 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
+	// load audio data
+	AVFormatContext *audioin = NULL;
+	if (avformat_open_input(&audioin, "file:intermezzo.webm", NULL, NULL) < 0) {
+		fprintf(stderr, "failed to open audio data\n");
+	}
+
+	int index = av_find_best_stream(audioin, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+	if (index < 0) {
+		fprintf(stderr, "failed to find audio stream\n");
+		return 1;
+	}
+
+	AVStream *audioinstream = audioin->streams[index];
+
 	const AVOutputFormat *fmt = av_guess_format(NULL, FILENAME, NULL);
 	if (!fmt) {
 		fprintf(stderr, "unknown output format\n");
@@ -214,8 +238,11 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	AVStream *stream = avformat_new_stream(fc, NULL);
-	stream->id = fc->nb_streams-1;
+	AVStream *vidstream = avformat_new_stream(fc, NULL);
+	vidstream->id = fc->nb_streams-1;
+
+	AVStream *audiostream = avformat_new_stream(fc, NULL);
+	vidstream->id = fc->nb_streams-1;
 
 	AVCodecContext *c = avcodec_alloc_context3(codec);
 	if (!c) {
@@ -239,7 +266,7 @@ main(int argc, char *argv[])
 	c->gop_size = 30*3;
 	AVDictionary *opts = NULL;
 
-	stream->time_base = c->time_base;
+	vidstream->time_base = c->time_base;
 	frame->format = c->pix_fmt;
 	frame->width = c->width;
 	frame->height = c->height;
@@ -275,7 +302,12 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (avcodec_parameters_from_context(stream->codecpar, c) < 0) {
+	if (avcodec_parameters_from_context(vidstream->codecpar, c) < 0) {
+		fprintf(stderr, "failed to copy stream parameters\n");
+		return 1;
+	}
+
+	if (avcodec_parameters_copy(audiostream->codecpar, audioinstream->codecpar) < 0) {
 		fprintf(stderr, "failed to copy stream parameters\n");
 		return 1;
 	}
@@ -288,7 +320,8 @@ main(int argc, char *argv[])
 
 	bool done = false;
 	double time = 0;
-	double framecount = 0;
+	int framecount = 0;
+	int aframe = 0;
 	while (!done) {
 		/* fill with white */
 		cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
@@ -323,9 +356,14 @@ main(int argc, char *argv[])
 
 		fflush(stdout);
 		frame->pts = framecount;
-		putframe(fc, stream, c, frame, pkt);
+		putframe(fc, vidstream, c, frame, pkt);
 		time += 0.00390625;
 		framecount += 1;
+	}
+
+	while (av_read_frame(audioin, pkt) >= 0) {
+		pkt->stream_index = audiostream->index;
+		av_interleaved_write_frame(fc, pkt);
 	}
 
 	av_write_trailer(fc);
