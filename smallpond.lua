@@ -725,9 +725,8 @@ for staff, item in ipairs(extra3) do
 end
 
 function drawframe(time)
-	local toff = 0
-	--print(framewidth - toff, xmax)
-	if time > 4 then
+	local toff = -50*time
+	if time > 10 then
 		return true
 	end
 
