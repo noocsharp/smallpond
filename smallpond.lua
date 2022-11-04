@@ -468,7 +468,7 @@ local staff3ify = function(timing, el, staff)
 		-- stem
 		if el.stemdir then
 			local stoptime
-			if el.time then stoptime = el.time + .125 else stoptime = nil end
+			if el.time then stoptime = el.time + .25 else stoptime = nil end
 			if el.stemdir == -1 then
 				-- stem up
 				-- advance width for bravura is 1.18 - .1 for stem width
@@ -526,7 +526,10 @@ local staff3ify = function(timing, el, staff)
 				inc = 7
 			end
 			for yoff=first, last, inc do
-				table.insert(staff3[staff], {kind="vshear", x1=x1 - 0.5, x2=x2, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, h=5, time={start=el.notes[i-1].time, stop=el.notes[i].time}})
+				local starttime, stoptime
+				if el.notes[i].time then stoptime = el.notes[i].time + .25 else stoptime = nil end
+				if el.notes[i].time then starttime = el.notes[i-1].time + .25 else starttime = nil end
+				table.insert(staff3[staff], {kind="vshear", x1=x1 - 0.5, x2=x2, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, h=5, time={start=starttime, stop=stoptime}})
 			end
 			::continue::
 		end
