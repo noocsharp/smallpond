@@ -120,13 +120,12 @@ local commands = {
 			-- TODO: should we be more strict about accidentals and stem orientations on rests?
 			--local s, e, note, acc, shift = string.find(text, "^([abcdefgs])([fns]?)([,']*)", start)
 			local s, e, time, note, acc, shift = string.find(text, "^(%d*%.?%d*)([abcdefgs])([fns]?)([,']*)", start)
-			print(note, tonumber(time) or nil)
 			if note then
 				local out
 				if note == 's' then
 					out = {command='srest', count=tonumber(count)}
 				else
-					out = {command="note", time=tonumber(time) or nil, note=note, acc=acc, count=tonumber(count)}
+					out = {command="note", time=tonumber(time), note=note, acc=acc, count=tonumber(count)}
 				end
 
 				local _, down = string.gsub(shift, ',', '')
@@ -255,11 +254,12 @@ local dispatch1 = {
 	newnotegroup = function(data)
 		local heads = {}
 		local beamcount = math.log(data.count) / math.log(2) - 2
-		local maxtime = 0
+		local maxtime
 		for _, note in ipairs(data.notes) do
 			octave = octave - note.shift
 			table.insert(heads, {acc=note.acc, y=clef.place(note.note, octave), time=note.time})
-			if note.time and note.time > maxtime then maxtime = note.time end
+			if note.time and not maxtime then maxtime = note.time end
+			if maxtime and note.time and note.time > maxtime then maxtime = note.time end
 		end
 
 		local note = {kind="notecolumn", beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, length=data.count, time=maxtime, heads=heads}
@@ -440,17 +440,19 @@ local staff3ify = function(timing, el, staff)
 			lowheight = math.min(lowheight, ry)
 			highheight = math.max(highheight, ry)
 
+			local stoptime
+			if el.time then stoptime = el.time + 1 else stoptime = nil end
 			-- TODO: only do this once per column
 			-- leger lines
 			if head.y <= -6 then
 				for j = -6, head.y, -2 do
-					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2, time={start=el.time, stop=el.time+1}})
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2, time={start=el.time, stop=stoptime}})
 				end
 			end
 
 			if head.y >= 6 then
 				for j = 6, head.y, 2 do
-					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2, time={start=el.time, stop=el.time+1}})
+					table.insert(staff3[staff], {kind="line", t=1.2, x1=preoffset + rx - .2*em, y1=(em * (j + 4)) / 2, x2=preoffset + rx + w + .2*em, y2=(em * (j + 4)) / 2, time={start=el.time, stop=stoptime}})
 				end
 			end
 		end
@@ -465,18 +467,20 @@ local staff3ify = function(timing, el, staff)
 
 		-- stem
 		if el.stemdir then
+			local stoptime
+			if el.time then stoptime = el.time + .125 else stoptime = nil end
 			if el.stemdir == -1 then
 				-- stem up
 				-- advance width for bravura is 1.18 - .1 for stem width
 				el.stemx = w + rx - 1.08 + preoffset
 				el.stemy = lowheight -.168*em - el.stemlen*em
-				local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em, time={start=el.time, stop=el.time+.125}}
+				local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em, time={start=el.time, stop=stoptime}}
 				el.stem = stem
 				table.insert(staff3[staff], el.stem)
 			else
 				el.stemx = rx + .5 + preoffset
 				el.stemy = lowheight + el.stemlen*em
-				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=highheight + el.stemlen*em, time={start=el.time, stop=el.time+.125}}
+				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=highheight + el.stemlen*em, time={start=el.time, stop=stoptime}}
 				el.stem = stem
 				table.insert(staff3[staff], stem)
 			end
