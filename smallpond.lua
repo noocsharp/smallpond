@@ -522,7 +522,7 @@ local staff3ify = function(timing, el, staff)
 				inc = 7
 			end
 			for yoff=first, last, inc do
-				table.insert(staff3[staff], {kind="quad", x1=x1 - 0.5, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, x3=x2, y3=y0 + m*(x2 - x0) + 5 + yoff, x4=x1 - 0.5, y4=y0 + m*(x1 - x0) + 5 + yoff, time={start=timing, stop=timing+1}})
+				table.insert(staff3[staff], {kind="vshear", x1=x1 - 0.5, x2=x2, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, h=5, time={start=el.notes[i-1].time, stop=el.notes[i].time}})
 			end
 			::continue::
 		end
@@ -745,7 +745,7 @@ function drawframe(time)
 						endy = math.max(d.y1 + delta*(d.y2 - d.y1), d.y2)
 					end
 					draw_line(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy - extent.ymin + extent.yoff)
-				elseif d.kind == "quad" then
+				elseif d.kind == "vshear" then
 					local delta = (time - d.time.start) / (d.time.stop - d.time.start)
 					local endx, endy
 					if d.x1 < d.x2 then
@@ -758,7 +758,9 @@ function drawframe(time)
 					else
 						endy = math.max(d.y1 + delta*(d.y2 - d.y1), d.y2)
 					end
-					draw_quad(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff, toff + d.x3 - extent.xmin, d.y3 - extent.ymin + extent.yoff, toff + d.x4 - extent.xmin, d.y4 - extent.ymin + extent.yoff)
+					draw_quad(toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy + 5 - extent.ymin + extent.yoff, toff + d.x1 - extent.xmin, d.y1 + 5 - extent.ymin + extent.yoff)
+				elseif d.kind == "quad" then
+					draw_quad(toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff, toff + d.x3 - extent.xmin, d.y3 - extent.ymin + extent.yoff, toff + d.x4 - extent.xmin, d.y4 - extent.ymin + extent.yoff)
 				end
 			end
 
