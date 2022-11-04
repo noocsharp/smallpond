@@ -357,7 +357,7 @@ main(int argc, char *argv[])
 		fflush(stdout);
 		frame->pts = framecount;
 		putframe(fc, vidstream, c, frame, pkt);
-		time += 0.00390625;
+		time += 1.0 / 30;
 		framecount += 1;
 	}
 
