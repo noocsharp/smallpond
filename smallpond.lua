@@ -262,14 +262,12 @@ local dispatch1 = {
 			if maxtime and note.time and note.time > maxtime then maxtime = note.time end
 		end
 
-		local count
+		local incr = 1 / data.count
 		if data.dot then
-			count = data.count + data.count / 2
-		else
-			count = data.count
+			incr = incr + (1 / (2*data.count))
 		end
-		
-		local note = {kind="notecolumn", beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, dot=data.dot, count=count, length=data.count, time=maxtime, heads=heads}
+
+		local note = {kind="notecolumn", beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, dot=data.dot, count=incr, length=data.count, time=maxtime, heads=heads}
 		if data.beam == 1 then
 			assert(inbeam == 0)
 			inbeam = 1
@@ -284,7 +282,7 @@ local dispatch1 = {
 		table.insert(staff1[curname], note)
 		table.insert(timings[time].staffs[curname].on, note)
 		lastnote = note
-		time = time + 1 / data.count
+		time = time + incr
 	end,
 	changeclef = function(data)
 		local class = assert(Clef[data.kind])
