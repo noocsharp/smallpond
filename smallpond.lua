@@ -93,7 +93,7 @@ local stafforder = {}
 local commands = {
 	voice = function (text, start)
 		local parsenotecolumn = function(text, start)
-			local s, e, flags, count, beam = string.find(text, "^([v^]?)(%d*)([%[%]]?)", start)
+			local s, e, flags, count, dot, beam = string.find(text, "^([v^]?)(%d*)(%.?)([%[%]]?)", start)
 			local out = {}
 
 			if string.find(flags, "v", 1, true) then
@@ -113,19 +113,19 @@ local commands = {
 				assert(math.ceil(math.log(count)/math.log(2)) == math.floor(math.log(count)/math.log(2)), "note count is not a power of 2")
 			end
 			out.count = tonumber(count)
+			out.dot = #dot == 1
 
 			return start + e - s + 1, out
 		end
 		local parsenote = function(text, start)
 			-- TODO: should we be more strict about accidentals and stem orientations on rests?
-			--local s, e, note, acc, shift = string.find(text, "^([abcdefgs])([fns]?)([,']*)", start)
 			local s, e, time, note, acc, shift = string.find(text, "^(%d*%.?%d*)([abcdefgs])([fns]?)([,']*)", start)
 			if note then
 				local out
 				if note == 's' then
-					out = {command='srest', count=tonumber(count)}
+					out = {command='srest'}
 				else
-					out = {command="note", time=tonumber(time), note=note, acc=acc, count=tonumber(count)}
+					out = {command="note", time=tonumber(time), note=note, acc=acc}
 				end
 
 				local _, down = string.gsub(shift, ',', '')
@@ -187,7 +187,7 @@ local commands = {
 			if note.command == 'srest' then
 				table.insert(voice, {command='srest', count=col.count})
 			else
-				table.insert(voice, {command="newnotegroup", count=col.count, stemdir=col.stemdir, beam=col.beam, notes={[1] = note}})
+				table.insert(voice, {command="newnotegroup", count=col.count, stemdir=col.stemdir, beam=col.beam, dot=col.dot, notes={[1] = note}})
 			end
 		end
 
@@ -262,7 +262,14 @@ local dispatch1 = {
 			if maxtime and note.time and note.time > maxtime then maxtime = note.time end
 		end
 
-		local note = {kind="notecolumn", beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, length=data.count, time=maxtime, heads=heads}
+		local count
+		if data.dot then
+			count = data.count + data.count / 2
+		else
+			count = data.count
+		end
+		
+		local note = {kind="notecolumn", beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, dot=data.dot, count=count, length=data.count, time=maxtime, heads=heads}
 		if data.beam == 1 then
 			assert(inbeam == 0)
 			inbeam = 1
@@ -414,6 +421,7 @@ local staff3ify = function(timing, el, staff)
 		local w, h = glyph_extents(glyph)
 
 		local preoffset = 0
+		-- TODO: increment on each accidental to reduce overlap
 		for _, head in ipairs(el.heads) do
 			if #head.acc then
 				preoffset = 10
@@ -429,6 +437,10 @@ local staff3ify = function(timing, el, staff)
 			if not lowheight then lowheight = ry end
 			if not highheight then highheight = ry end
 			table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=preoffset + rx, y=ry, time={start=head.time}})
+			if el.dot then
+				xdiff = xdiff + 5
+				table.insert(staff3[staff], {kind="circle", r=1.5, x=preoffset + rx + w + 5, y=ry, time={start=head.time}})
+			end
 			if head.acc == "s" then
 				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry, time={start=head.time}})
 			elseif head.acc == "f" then
@@ -726,7 +738,7 @@ end
 
 function drawframe(time)
 	local toff = -50*time
-	if time > 10 then
+	if time > 15 then
 		return true
 	end
 
@@ -751,6 +763,8 @@ function drawframe(time)
 						endy = math.max(d.y1 + delta*(d.y2 - d.y1), d.y2)
 					end
 					draw_line(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy - extent.ymin + extent.yoff)
+				elseif d.kind == "circle" then
+					draw_circle(d.r, toff + d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
 				elseif d.kind == "vshear" then
 					local delta = (time - d.time.start) / (d.time.stop - d.time.start)
 					local endx, endy

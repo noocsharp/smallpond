@@ -23,6 +23,21 @@ cairo_font_face_t *cface;
 cairo_surface_t *surface;
 
 int
+draw_circle(lua_State *L)
+{
+	double r = lua_tonumber(L, -3);
+	double x = lua_tonumber(L, -2);
+	double y = lua_tonumber(L, -1);
+
+	cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
+
+	cairo_arc(cr, x, y, r, 0, 2*M_PI);
+	cairo_fill(cr);
+
+	return 0;
+}
+
+int
 draw_line(lua_State *L)
 {
 	double t = lua_tonumber(L, -5);
@@ -99,18 +114,6 @@ glyph_extents(lua_State *L)
 }
 
 int
-create_surface(lua_State *L)
-{
-	double width = lua_tonumber(L, -2);
-	double height = lua_tonumber(L, -1);
-
-	cairo_set_font_face(cr, cface);
-	cairo_set_font_size(cr, 32.0);
-
-	return 0;
-}
-
-int
 putframe(AVFormatContext *fctx, const AVStream *st, AVCodecContext *ctx, AVFrame *frame, AVPacket *pkt)
 {
 	int ret;
@@ -159,10 +162,10 @@ main(int argc, char *argv[])
 {
 	lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
-	lua_pushcfunction(L, create_surface);
-	lua_setglobal(L, "create_surface");
 	lua_pushcfunction(L, draw_glyph);
 	lua_setglobal(L, "draw_glyph");
+	lua_pushcfunction(L, draw_circle);
+	lua_setglobal(L, "draw_circle");
 	lua_pushcfunction(L, draw_line);
 	lua_setglobal(L, "draw_line");
 	lua_pushcfunction(L, draw_quad);
