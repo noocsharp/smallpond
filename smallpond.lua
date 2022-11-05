@@ -350,9 +350,19 @@ function trybeam(staffname, tobeam, beampattern)
 		end
 
 		-- update the stem direction
+		local unset = true
 		for _, note in ipairs(tobeam) do
-			note.stemdir = stemdir
-			table.insert(staff, note)
+			if note.stemdir then
+				unset = false
+				break
+			end
+		end
+
+		if unset then
+			for _, note in ipairs(tobeam) do
+				note.stemdir = stemdir
+				table.insert(staff, note)
+			end
 		end
 		local beam = {kind='beam', notes=tobeam, pattern=beampattern, stemdir=stemdir, maxbeams=math.max(table.unpack(beampattern))}
 		table.insert(staff, beam)
