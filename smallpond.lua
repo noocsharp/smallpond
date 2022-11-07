@@ -177,6 +177,7 @@ local commands = {
 				group.count = out.count
 				group.stemdir = out.stemdir
 				group.beam = out.beam
+				group.dot = out.dot
 				table.insert(voice, group)
 				goto start
 			end
