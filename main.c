@@ -82,6 +82,7 @@ draw_quad(lua_State *L)
 int
 draw_glyph(lua_State *L)
 {
+	double size = lua_tonumber(L, -4);
 	unsigned int val = lua_tonumber(L, -3);
 	double x = lua_tonumber(L, -2);
 	double y = lua_tonumber(L, -1);
@@ -90,7 +91,7 @@ draw_glyph(lua_State *L)
 	cairo_glyph_t glyph = {index, x, y};
 
 	cairo_set_font_face(cr, cface);
-	cairo_set_font_size(cr, 32.0);
+	cairo_set_font_size(cr, size);
 
 	cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
 	cairo_show_glyphs(cr, &glyph, 1);

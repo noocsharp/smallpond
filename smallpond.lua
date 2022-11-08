@@ -155,6 +155,7 @@ local commands = {
 				goto start
 			end
 
+			-- barline
 			local s, e = string.find(text, "^|", i)
 			if s then
 				i = i + e - s + 1
@@ -162,6 +163,24 @@ local commands = {
 				goto start
 			end
 
+			-- grace (untimed precursor)
+			local s, e = string.find(text, "^%b{}", i)
+			if s then
+				local notes = {}
+				-- TODO: deal with notegroups
+				i = i + 1
+				while i <= e - 1 do
+					i = i + #(string.match(text, "^%s*", i) or "")
+					if i >= #text then return i end
+					i, note = parsenote(text, i)
+					i, col = parsenotecolumn(text, i)
+					table.insert(voice, {command="newnotegroup", count=col.count, stemdir=col.stemdir, beam=col.beam, dot=col.dot, grace=true, notes={[1] = note}})
+				end
+				i = e + 1
+				goto start
+			end
+
+			-- note column
 			local s, e = string.find(text, "^%b<>", i)
 			if s then
 				i = i + 1
@@ -268,7 +287,13 @@ local dispatch1 = {
 			incr = incr + (1 / (2*data.count))
 		end
 
-		local note = {kind="notecolumn", beamcount=beamcount, stemdir=data.stemdir, stemlen=3.5, dot=data.dot, count=incr, length=data.count, time=maxtime, heads=heads}
+		local stemlen
+		if data.grace then
+			stemlen = 2.5
+		else
+			stemlen = 3.5
+		end
+		local note = {kind="notecolumn", beamcount=beamcount, stemdir=data.stemdir, stemlen=stemlen, dot=data.dot, grace=data.grace, count=incr, length=data.count, time=maxtime, heads=heads}
 		if data.beam == 1 then
 			assert(inbeam == 0)
 			inbeam = 1
@@ -281,9 +306,14 @@ local dispatch1 = {
 			note.beamed = inbeam
 		end
 		table.insert(staff1[curname], note)
-		table.insert(timings[time].staffs[curname].on, note)
+
+		if note.grace then
+			table.insert(timings[time].staffs[curname].pre, note)
+		else
+			table.insert(timings[time].staffs[curname].on, note)
+			time = time + incr
+		end
 		lastnote = note
-		time = time + incr
 	end,
 	changeclef = function(data)
 		local class = assert(Clef[data.kind])
@@ -312,7 +342,7 @@ local dispatch1 = {
 	srest = function(data)
 		table.insert(staff1[curname], {kind='srest', length=data.count, time=time})
 		time = time + 1 / data.count
-	end
+	end,
 }
 
 for _, voice in ipairs(voices) do
@@ -365,7 +395,7 @@ function trybeam(staffname, tobeam, beampattern)
 				table.insert(staff, note)
 			end
 		end
-		local beam = {kind='beam', notes=tobeam, pattern=beampattern, stemdir=stemdir, maxbeams=math.max(table.unpack(beampattern))}
+		local beam = {kind='beam', notes=tobeam, grace=tobeam[1].grace, pattern=beampattern, stemdir=stemdir, maxbeams=math.max(table.unpack(beampattern))}
 		table.insert(staff, beam)
 		tobeam[#tobeam].beamref = beam
 	elseif #tobeam == 1 then
@@ -414,6 +444,12 @@ end
 local staff3ify = function(timing, el, staff)
 	local xdiff
 	if el.kind == "notecolumn" then
+		local glyphsize
+		if el.grace then
+			glyphsize = 24
+		else
+			glyphsize = 32
+		end
 		local rx = x
 		xdiff = 10
 		rx = rx + xdiff
@@ -445,17 +481,17 @@ local staff3ify = function(timing, el, staff)
 			local ry = (em*head.y) / 2 + 2*em
 			if not lowheight then lowheight = ry end
 			if not highheight then highheight = ry end
-			table.insert(staff3[staff], {kind="glyph", glyph=glyph, x=preoffset + rx, y=ry, time={start=head.time}})
+			table.insert(staff3[staff], {kind="glyph", size=glyphsize, glyph=glyph, x=preoffset + rx, y=ry, time={start=head.time}})
 			if el.dot then
 				xdiff = xdiff + 5
 				table.insert(staff3[staff], {kind="circle", r=1.5, x=preoffset + rx + w + 5, y=ry, time={start=head.time}})
 			end
 			if head.acc == "s" then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalSharp"], x=rx, y=ry, time={start=head.time}})
+				table.insert(staff3[staff], {kind="glyph", size=glyphsize, glyph=Glyph["accidentalSharp"], x=rx, y=ry, time={start=head.time}})
 			elseif head.acc == "f" then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalFlat"], x=rx, y=ry, time={start=head.time}})
+				table.insert(staff3[staff], {kind="glyph", size=glyphsize, glyph=Glyph["accidentalFlat"], x=rx, y=ry, time={start=head.time}})
 			elseif head.acc == "n" then
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["accidentalNatural"], x=rx, y=ry, time={start=head.time}})
+				table.insert(staff3[staff], {kind="glyph", size=glyphsize, glyph=Glyph["accidentalNatural"], x=rx, y=ry, time={start=head.time}})
 			end
 
 			lowheight = math.min(lowheight, ry)
@@ -510,11 +546,11 @@ local staff3ify = function(timing, el, staff)
 		if el.length == 8 and el.beamed == 0 then
 			if el.stemdir == 1 then
 				local fx, fy = glyph_extents(Glyph["flag8thDown"])
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], x=preoffset + rx, y=highheight + 3.5*em, time={start=el.time}})
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], size=glyphsize, x=preoffset + rx, y=highheight + 3.5*em, time={start=el.time}})
 			else
 				-- TODO: move glyph extents to a precalculated table or something
 				local fx, fy = glyph_extents(Glyph["flag8thUp"])
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], x=el.stemx - .48, y=lowheight -.168*em - 3.5*em, time={start=el.time}})
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], size=glyphsize, x=el.stemx - .48, y=lowheight -.168*em - 3.5*em, time={start=el.time}})
 				xdiff = xdiff + fx
 			end
 		end
@@ -523,6 +559,14 @@ local staff3ify = function(timing, el, staff)
 	elseif el.kind == "srest" then
 		xdiff = 0
 	elseif el.kind == "beam" then
+		local beamheight, beamspace
+		if el.grace then
+			beamheight = 3
+			beamspace = 5
+		else
+			beamheight = 5
+			beamspace = 7
+		end
 		local m = (el.notes[#el.notes].stemy - el.notes[1].stemy) / (el.notes[#el.notes].stemx - el.notes[1].stemx)
 		local x0 = el.notes[1].stemx
 		local y0 = el.notes[1].stemy
@@ -536,21 +580,21 @@ local staff3ify = function(timing, el, staff)
 
 			local first, last, inc
 			if el.stemdir == 1 then
-				first = 7*(el.maxbeams - 2)
-				last = 7*(el.maxbeams - n - 1)
-				el.notes[i].stem.y2 = y0 + m*(x2 - x0) + 7*(el.maxbeams - 2) + 5
-				inc = -7
+				first = beamspace*(el.maxbeams - 2)
+				last = beamspace*(el.maxbeams - n - 1)
+				el.notes[i].stem.y2 = y0 + m*(x2 - x0) + 7*(el.maxbeams - 2) + beamheight
+				inc = -beamspace
 			else
 				el.notes[i].stem.y2 = y0 + m*(x2 - x0)
 				first = 0
-				last = 7*(n-1)
-				inc = 7
+				last = beamspace*(n-1)
+				inc = beamspace
 			end
 			for yoff=first, last, inc do
 				local starttime, stoptime
 				if el.notes[i].time then stoptime = el.notes[i].time + .25 else stoptime = nil end
 				if el.notes[i].time then starttime = el.notes[i-1].time + .25 else starttime = nil end
-				table.insert(staff3[staff], {kind="vshear", x1=x1 - 0.5, x2=x2, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, h=5, time={start=starttime, stop=stoptime}})
+				table.insert(staff3[staff], {kind="vshear", x1=x1 - 0.5, x2=x2, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, h=beamheight, time={start=starttime, stop=stoptime}})
 			end
 			::continue::
 		end
@@ -598,6 +642,17 @@ for _, time in ipairs(points) do
 		table.insert(extra3, {kind='barline', x=x+25})
 		x = x + 10
 	end
+
+	for staff, vals in pairs(todraw) do
+		if #vals.on == 0 then goto nextstaff end
+		for _, el in ipairs(vals.pre) do
+			local diff = staff3ify(time, el, staff)
+			if el.beamref then staff3ify(time, el.beamref, staff) end
+			x = x + diff
+		end
+		::nextstaff::
+	end
+	xdiff = 0
 
 	for staff, vals in pairs(todraw) do
 		if #vals.on == 0 then goto nextstaff end
@@ -746,8 +801,8 @@ for staff, item in ipairs(extra3) do
 end
 
 function drawframe(time)
-	local toff = -50*time
-	if time > 15 then
+	local toff = -90*time
+	if time > 30 then
 		return true
 	end
 
@@ -757,7 +812,7 @@ function drawframe(time)
 			if not d.time.start then goto continue end
 			if d.time.start < time then
 				if d.kind == "glyph" then
-					draw_glyph(d.glyph, toff + d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
+					draw_glyph(d.size, d.glyph, toff + d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
 				elseif d.kind == "line" then
 					local delta = (time - d.time.start) / (d.time.stop - d.time.start)
 					local endx, endy
@@ -787,7 +842,7 @@ function drawframe(time)
 					else
 						endy = math.max(d.y1 + delta*(d.y2 - d.y1), d.y2)
 					end
-					draw_quad(toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy + 5 - extent.ymin + extent.yoff, toff + d.x1 - extent.xmin, d.y1 + 5 - extent.ymin + extent.yoff)
+					draw_quad(toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy + d.h - extent.ymin + extent.yoff, toff + d.x1 - extent.xmin, d.y1 + d.h - extent.ymin + extent.yoff)
 				elseif d.kind == "quad" then
 					draw_quad(toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff, toff + d.x3 - extent.xmin, d.y3 - extent.ymin + extent.yoff, toff + d.x4 - extent.xmin, d.y4 - extent.ymin + extent.yoff)
 				end
