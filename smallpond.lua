@@ -578,6 +578,7 @@ local staff3ify = function(timing, el, staff)
 			local x1 = el.notes[i-1].stemx
 			local x2 = el.notes[i].stemx
 
+			-- change layout parameters depending on stem up or stem down
 			local first, last, inc
 			if el.stemdir == 1 then
 				first = beamspace*(el.maxbeams - 2)
@@ -590,6 +591,8 @@ local staff3ify = function(timing, el, staff)
 				last = beamspace*(n-1)
 				inc = beamspace
 			end
+
+			-- draw beams segment by segment
 			for yoff=first, last, inc do
 				local starttime, stoptime
 				if el.notes[i].time then stoptime = el.notes[i].time + .25 else stoptime = nil end
@@ -611,6 +614,8 @@ local staff3ify = function(timing, el, staff)
 	return xdiff
 end
 
+local rtimings = {}
+local snappoints = {}
 for _, time in ipairs(points) do
 	local todraw = timings[time].staffs
 
@@ -643,6 +648,7 @@ for _, time in ipairs(points) do
 		x = x + 10
 	end
 
+	-- prebeat
 	for staff, vals in pairs(todraw) do
 		if #vals.on == 0 then goto nextstaff end
 		for _, el in ipairs(vals.pre) do
@@ -654,10 +660,13 @@ for _, time in ipairs(points) do
 	end
 	xdiff = 0
 
+	local maxtime = 0
+	-- on beat
 	for staff, vals in pairs(todraw) do
 		if #vals.on == 0 then goto nextstaff end
 		local diff
 		for _, el in ipairs(vals.on) do
+			if el.time > maxtime then maxtime = el.time end
 			diff = staff3ify(time, el, staff)
 			if el.beamref then staff3ify(time, el.beamref, staff) end
 		end
@@ -666,6 +675,8 @@ for _, time in ipairs(points) do
 	end
 
 	x = x + xdiff
+	rtimings[maxtime] = x
+	table.insert(snappoints, maxtime)
 end
 
 -- calculate extents
@@ -800,8 +811,19 @@ for staff, item in ipairs(extra3) do
 	end
 end
 
+-- TODO: is there a better way to do this?
+snappoints[0] = snappoints[1]
+local snapidx = 1
+local toff_base = 0
 function drawframe(time)
-	local toff = -90*time
+	if snappoints[snapidx + 1] and snappoints[snapidx] < time then
+		snapidx = snapidx + 1
+		toff_base = -rtimings[snappoints[snapidx - 1]] + framewidth / 2
+	end
+	local xdiff = rtimings[snappoints[snapidx]] - rtimings[snappoints[snapidx - 1]]
+	local delta = xdiff * (time - snappoints[snapidx - 1]) / (snappoints[snapidx] - snappoints[snapidx - 1])
+	local toff = toff_base - delta
+
 	if time > 30 then
 		return true
 	end
