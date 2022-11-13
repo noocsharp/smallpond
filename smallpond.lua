@@ -693,7 +693,7 @@ for _, time in ipairs(points) do
 		if #vals.on == 0 then goto nextstaff end
 		local diff
 		for _, el in ipairs(vals.on) do
-			if el.time > maxtime then maxtime = el.time end
+			if el.time and el.time > maxtime then maxtime = el.time end
 			diff = staff3ify(time, el, staff)
 			if el.beamref then staff3ify(time, el.beamref, staff) end
 		end
@@ -703,7 +703,9 @@ for _, time in ipairs(points) do
 
 	x = x + xdiff
 	rtimings[maxtime] = x
-	table.insert(snappoints, maxtime)
+	if maxtime ~= 0 then
+		table.insert(snappoints, maxtime)
+	end
 end
 
 -- calculate extents
@@ -838,6 +840,11 @@ for staff, item in ipairs(extra3) do
 	end
 end
 
+local lastpoint = 0
+for _, point in ipairs(snappoints) do
+	lastpoint = math.max(point, lastpoint)
+end
+
 -- TODO: is there a better way to do this?
 snappoints[0] = snappoints[1]
 local snapidx = 1
@@ -851,7 +858,7 @@ function drawframe(time)
 	local delta = xdiff * (time - snappoints[snapidx - 1]) / (snappoints[snapidx] - snappoints[snapidx - 1])
 	local toff = toff_base - delta
 
-	if time > 30 then
+	if time > lastpoint + 3 then
 		return true
 	end
 
