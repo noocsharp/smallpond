@@ -550,21 +550,21 @@ local staff3ify = function(timing, el, staff)
 		end
 
 		-- stem
+		local stemstoptime
 		if el.stemdir then
-			local stoptime
-			if el.time then stoptime = el.time + .25 else stoptime = nil end
+			if el.time then stemstoptime = el.time + .25 else stopstoptime = nil end
 			if el.stemdir == -1 then
 				-- stem up
 				-- advance width for bravura is 1.18 - .1 for stem width
 				el.stemx = w + rx - 1.08 + preoffset + altoffset
 				el.stemy = lowheight -.168*em - el.stemlen*em
-				local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em, time={start=el.time, stop=stoptime}}
+				local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em, time={start=el.time, stop=stemstoptime}}
 				el.stem = stem
 				table.insert(staff3[staff], el.stem)
 			else
 				el.stemx = rx + .5 + preoffset + altoffset
 				el.stemy = lowheight + el.stemlen*em
-				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=highheight + el.stemlen*em, time={start=el.time, stop=stoptime}}
+				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=highheight + el.stemlen*em, time={start=el.time, stop=stemstoptime}}
 				el.stem = stem
 				table.insert(staff3[staff], stem)
 			end
@@ -573,11 +573,11 @@ local staff3ify = function(timing, el, staff)
 		if el.length == 8 and el.beamed == 0 then
 			if el.stemdir == 1 then
 				local fx, fy = glyph_extents(Glyph["flag8thDown"])
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], size=glyphsize, x=altoffset + preoffset + rx, y=highheight + 3.5*em, time={start=el.time}})
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], size=glyphsize, x=altoffset + preoffset + rx, y=highheight + 3.5*em, time={start=stemstoptime}})
 			else
 				-- TODO: move glyph extents to a precalculated table or something
 				local fx, fy = glyph_extents(Glyph["flag8thUp"])
-				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], size=glyphsize, x=altoffset + el.stemx - .48, y=lowheight -.168*em - 3.5*em, time={start=el.time}})
+				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], size=glyphsize, x=altoffset + el.stemx - .48, y=lowheight -.168*em - 3.5*em, time={start=stemstoptime}})
 				xdiff = xdiff + fx
 			end
 		end
