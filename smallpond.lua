@@ -268,7 +268,9 @@ local points = {}
 local pointthere = {}
 local timings = {}
 local curname
-local inbeam = 0
+local inbeam = false
+local beam
+local beams = {}
 -- first-order placement
 local dispatch1 = {
 	newnotegroup = function(data)
@@ -309,18 +311,27 @@ local dispatch1 = {
 		else
 			stemlen = 3.5
 		end
-		local note = {kind="notecolumn", beamcount=beamcount, stemdir=data.stemdir, stemlen=stemlen, dot=data.dot, grace=data.grace, count=incr, length=data.count, time=maxtime, heads=heads}
+		local note = {kind="notecolumn", stemdir=data.stemdir, stemlen=stemlen, dot=data.dot, grace=data.grace, count=incr, length=data.count, time=maxtime, heads=heads}
 		if data.beam == 1 then
-			assert(inbeam == 0)
-			inbeam = 1
-			note.beamed = inbeam
+			assert(not inbeam)
+			beamednotes = {}
+			table.insert(beams, beamednotes)
+			table.insert(beamednotes, {note=note, count=beamcount})
+			beamednotes.maxbeams = beamcount
+			note.beamgroup = beamednotes
+			inbeam = true
 		elseif data.beam == -1 then
-			assert(inbeam == 1)
-			inbeam = 0
-			note.beamed = -1
-		else
-			note.beamed = inbeam
+			assert(inbeam)
+			inbeam = false
+			table.insert(beamednotes, {note=note, count=beamcount})
+			beamednotes.maxbeams = math.max(beamednotes.maxbeams, beamcount)
+			note.beamgroup = beamednotes
+		elseif inbeam then
+			beamednotes.maxbeams = math.max(beamednotes.maxbeams, beamcount)
+			table.insert(beamednotes, {note=note, count=beamcount})
+			note.beamgroup = beamednotes
 		end
+
 		table.insert(staff1[curname], note)
 
 		if note.grace then
@@ -376,75 +387,36 @@ end
 
 table.sort(points)
 
--- second-order placement
-local staff2 = {}
-
-function trybeam(staffname, tobeam, beampattern)
-	local staff = staff2[staffname]
-	if #tobeam > 1 then
-		-- check which way the stem should point on all the notes in the beam
-		local ysum = 0
-		for _, note in ipairs(tobeam) do
-			-- FIXME: note.heads[1].y is wrong
-			ysum = ysum + note.heads[1].y
-		end
-
-		local stemdir
-		if ysum >= 0 then
-			stemdir = -1
-		else
-			stemdir = 1
-		end
-
-		-- update the stem direction
-		local unset = true
-		for _, note in ipairs(tobeam) do
-			if note.stemdir then
-				unset = false
-				break
-			end
-		end
-
-		if unset then
-			for _, note in ipairs(tobeam) do
-				note.stemdir = stemdir
-				table.insert(staff, note)
-			end
-		end
-		local beam = {kind='beam', notes=tobeam, grace=tobeam[1].grace, pattern=beampattern, stemdir=stemdir, maxbeams=math.max(table.unpack(beampattern))}
-		table.insert(staff, beam)
-		tobeam[#tobeam].beamref = beam
-	elseif #tobeam == 1 then
-		tobeam[1].beamed = false
-		table.insert(staff, tobeam[1])
+for _, beam in pairs(beams) do
+	-- check which way the stem should point on all the notes in the beam
+	local ysum = 0
+	for _, entry in ipairs(beam) do
+		-- FIXME: note.heads[1].y is wrong
+		ysum = ysum + entry.note.heads[1].y
 	end
-end
 
-for name, staff in pairs(staff1) do
-	staff2[name] = {}
-	local tobeam = {}
-	local beampattern = {}
-	for i, el in ipairs(staff) do
-		if el.kind == 'notecolumn' then
-			if el.beamed == 1 then
-				tobeam[#tobeam + 1] = el
-				beampattern[#beampattern + 1] = el.beamcount
-			elseif el.beamed == -1 then
-				tobeam[#tobeam + 1] = el
-				beampattern[#beampattern + 1] = el.beamcount
-				trybeam(name, tobeam, beampattern)
-				tobeam = {}
-				beampattern = {}
-			else
-				table.insert(staff2[name], el)
-			end
-		else
-			table.insert(staff2[name], el)
+	local stemdir
+	if ysum >= 0 then
+		stemdir = -1
+	else
+		stemdir = 1
+	end
+
+	-- check that stem direction hasn't been set manually
+	local unset = true
+	for _, entry in ipairs(beam) do
+		if entry.note.stemdir then
+			unset = false
+			break
 		end
 	end
-	trybeam(name, tobeam, beampattern)
-	tobeam = {}
-	beampattern = {}
+
+	-- update the stem direction
+	if unset then
+		for _, entry in ipairs(beam) do
+			entry.note.stemdir = stemdir
+		end
+	end
 end
 
 local staff3 = {}
@@ -453,7 +425,7 @@ local extra3 = {}
 local x = 10
 local lasttime = 0
 
-for staff, _ in pairs(staff2) do
+for staff, _ in pairs(staff1) do
 	staff3[staff] = {}
 end
 
@@ -581,53 +553,59 @@ local staff3ify = function(timing, el, staff)
 				xdiff = xdiff + fx
 			end
 		end
+
+		-- draw beam (and adjust stems) after all previous notes already have set values
+		if el.beamgroup and el.beamgroup[#el.beamgroup].note == el then
+			local notes = el.beamgroup
+			local beamheight, beamspace
+			if el.grace then
+				beamheight = 3
+				beamspace = 5
+			else
+				beamheight = 5
+				beamspace = 7
+			end
+			local m = (notes[#notes].note.stemy - notes[1].note.stemy) / (notes[#notes].note.stemx - notes[1].note.stemx)
+			local x0 = notes[1].note.stemx
+			local y0 = notes[1].note.stemy
+			if el.stemdir == 1 then
+				notes[1].note.stem.y2 = y0 + 7*(notes.maxbeams - 2) + 5
+			end
+			for i, entry in ipairs(notes) do
+				local note = entry.note
+				local n = entry.count
+				if i == 1 then goto continue end
+				local x1 = notes[i-1].note.stemx
+				local x2 = note.stemx
+
+				-- change layout parameters depending on stem up or stem down
+				local first, last, inc
+				if el.stemdir == 1 then
+					first = beamspace*(notes.maxbeams - 2)
+					last = beamspace*(notes.maxbeams - n - 1)
+					note.stem.y2 = y0 + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight
+					inc = -beamspace
+				else
+					note.stem.y2 = y0 + m*(x2 - x0)
+					first = 0
+					last = beamspace*(n-1)
+					inc = beamspace
+				end
+
+				-- draw beams segment by segment
+				for yoff=first, last, inc do
+					local starttime, stoptime
+					if note.time then stoptime = note.time + .25 else stoptime = nil end
+					if note.time then starttime = notes[i-1].note.time + .25 else starttime = nil end
+					table.insert(staff3[staff], {kind="vshear", x1=x1 - 0.5, x2=x2, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, h=beamheight, time={start=starttime, stop=stoptime}})
+				end
+				::continue::
+			end
+		end
 		xdiff = xdiff + 100 / el.length + 10
 		lasttime = el.time
 	elseif el.kind == "srest" then
 		xdiff = 0
-	elseif el.kind == "beam" then
-		local beamheight, beamspace
-		if el.grace then
-			beamheight = 3
-			beamspace = 5
-		else
-			beamheight = 5
-			beamspace = 7
-		end
-		local m = (el.notes[#el.notes].stemy - el.notes[1].stemy) / (el.notes[#el.notes].stemx - el.notes[1].stemx)
-		local x0 = el.notes[1].stemx
-		local y0 = el.notes[1].stemy
-		if el.stemdir == 1 then
-			el.notes[1].stem.y2 = y0 + 7*(el.maxbeams - 2) + 5
-		end
-		for i, n in ipairs(el.pattern) do
-			if i == 1 then goto continue end
-			local x1 = el.notes[i-1].stemx
-			local x2 = el.notes[i].stemx
-
-			-- change layout parameters depending on stem up or stem down
-			local first, last, inc
-			if el.stemdir == 1 then
-				first = beamspace*(el.maxbeams - 2)
-				last = beamspace*(el.maxbeams - n - 1)
-				el.notes[i].stem.y2 = y0 + m*(x2 - x0) + 7*(el.maxbeams - 2) + beamheight
-				inc = -beamspace
-			else
-				el.notes[i].stem.y2 = y0 + m*(x2 - x0)
-				first = 0
-				last = beamspace*(n-1)
-				inc = beamspace
-			end
-
-			-- draw beams segment by segment
-			for yoff=first, last, inc do
-				local starttime, stoptime
-				if el.notes[i].time then stoptime = el.notes[i].time + .25 else stoptime = nil end
-				if el.notes[i].time then starttime = el.notes[i-1].time + .25 else starttime = nil end
-				table.insert(staff3[staff], {kind="vshear", x1=x1 - 0.5, x2=x2, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, h=beamheight, time={start=starttime, stop=stoptime}})
-			end
-			::continue::
-		end
 	elseif el.kind == "clef" then
 		table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff, time={start=timing, stop=timing+1}})
 		xdiff =  30
