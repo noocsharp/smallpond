@@ -311,12 +311,13 @@ local dispatch1 = {
 		else
 			stemlen = 3.5
 		end
-		local note = {kind="notecolumn", stemdir=data.stemdir, stemlen=stemlen, dot=data.dot, grace=data.grace, count=incr, length=data.count, time=maxtime, heads=heads}
+		local note = {kind="notecolumn", stemdir=data.stemdir, stemlen=stemlen, dot=data.dot, grace=data.grace, count=incr, length=data.count, time=maxtime, heads=heads, staff=curname}
 		if data.beam == 1 then
 			assert(not inbeam)
 			beamednotes = {}
 			table.insert(beams, beamednotes)
 			table.insert(beamednotes, {note=note, count=beamcount})
+			if data.grace then beamednotes.grace = data.grace end
 			beamednotes.maxbeams = beamcount
 			note.beamgroup = beamednotes
 			inbeam = true
@@ -553,55 +554,6 @@ local staff3ify = function(timing, el, staff)
 				xdiff = xdiff + fx
 			end
 		end
-
-		-- draw beam (and adjust stems) after all previous notes already have set values
-		if el.beamgroup and el.beamgroup[#el.beamgroup].note == el then
-			local notes = el.beamgroup
-			local beamheight, beamspace
-			if el.grace then
-				beamheight = 3
-				beamspace = 5
-			else
-				beamheight = 5
-				beamspace = 7
-			end
-			local m = (notes[#notes].note.stemy - notes[1].note.stemy) / (notes[#notes].note.stemx - notes[1].note.stemx)
-			local x0 = notes[1].note.stemx
-			local y0 = notes[1].note.stemy
-			if el.stemdir == 1 then
-				notes[1].note.stem.y2 = y0 + 7*(notes.maxbeams - 2) + 5
-			end
-			for i, entry in ipairs(notes) do
-				local note = entry.note
-				local n = entry.count
-				if i == 1 then goto continue end
-				local x1 = notes[i-1].note.stemx
-				local x2 = note.stemx
-
-				-- change layout parameters depending on stem up or stem down
-				local first, last, inc
-				if el.stemdir == 1 then
-					first = beamspace*(notes.maxbeams - 2)
-					last = beamspace*(notes.maxbeams - n - 1)
-					note.stem.y2 = y0 + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight
-					inc = -beamspace
-				else
-					note.stem.y2 = y0 + m*(x2 - x0)
-					first = 0
-					last = beamspace*(n-1)
-					inc = beamspace
-				end
-
-				-- draw beams segment by segment
-				for yoff=first, last, inc do
-					local starttime, stoptime
-					if note.time then stoptime = note.time + .25 else stoptime = nil end
-					if note.time then starttime = notes[i-1].note.time + .25 else starttime = nil end
-					table.insert(staff3[staff], {kind="vshear", x1=x1 - 0.5, x2=x2, y1=y0 + m*(x1 - x0) + yoff, x2=x2, y2=y0 + m*(x2 - x0) + yoff, h=beamheight, time={start=starttime, stop=stoptime}})
-				end
-				::continue::
-			end
-		end
 		xdiff = xdiff + 100 / el.length + 10
 		lasttime = el.time
 	elseif el.kind == "srest" then
@@ -808,6 +760,65 @@ for i, staff in pairs(stafforder) do
 	yoff = yoff + extent.ymax - extent.ymin
 end
 
+-- draw beam (and adjust stems) after all previous notes already have set values
+for _, notes in ipairs(beams) do
+	local beamheight, beamspace
+	if notes.grace then
+		beamheight = 3
+		beamspace = 5
+	else
+		beamheight = 5
+		beamspace = 7
+	end
+	local x0 = notes[1].note.stemx
+	local y0 = notes[1].note.stemy + extents[notes[1].note.staff].yoff
+	local y0s = notes[1].note.stemy
+	local yn = notes[#notes].note.stemy + extents[notes[#notes].note.staff].yoff
+	local m = (yn - y0) / (notes[#notes].note.stemx - x0)
+	if notes.stemdir == 1 then
+		notes[1].note.stem.y2 = y0s + 7*(notes.maxbeams - 2) + 5
+	end
+	for i, entry in ipairs(notes) do
+		if i == 1 then goto continue end
+		local note = notes[i].note
+		local n = entry.count
+		local x1 = notes[i-1].note.stemx
+		local x2 = note.stemx
+		local extent = extents[note.staff]
+
+		-- change layout parameters depending on stem up or stem down
+		local first, last, inc
+		if entry.note.stemdir == 1 then
+			first = beamspace*(notes.maxbeams - 2)
+			last = beamspace*(notes.maxbeams - n - 1)
+			if entry.note.staff ~= notes[1].note.staff then
+				entry.note.stem.y2 = y0 + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight
+			else
+				entry.note.stem.y2 = y0s + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight
+			end
+			inc = -beamspace
+		else
+			if entry.note.staff ~= notes[1].note.staff then
+				entry.note.stem.y2 = y0s + m*(x2 - x0)
+			else
+				entry.note.stem.y2 = y0 + m*(x2 - x0)
+			end
+			first = 0
+			last = beamspace*(n-1)
+			inc = beamspace
+		end
+
+		-- draw beams segment by segment
+		for yoff=first, last, inc do
+			local starttime, stoptime
+			if note.time then stoptime = note.time + .25 else stoptime = nil end
+			if note.time then starttime = notes[i-1].note.time + .25 else starttime = nil end
+			table.insert(extra3, {kind="beamseg", x1=x1 - 0.5 - extent.xmin, x2=x2 - extent.xmin, y1=y0 + m*(x1 - x0) + yoff - extent.ymin, y2=y0 + m*(x2 - x0) + yoff - extent.ymin, h=beamheight, time={start=starttime, stop=stoptime}})
+		end
+		::continue::
+	end
+end
+
 for staff, item in ipairs(extra3) do
 	if item.kind == 'barline' then
 		if item.x < xmin then
@@ -895,7 +906,23 @@ function drawframe(time)
 	for staff, item in ipairs(extra3) do
 		if item.kind == 'barline' then
 			draw_line(1, toff + item.x, -firstymin, toff + item.x, lastymin + 4*em)
+		elseif item.kind == "beamseg" then
+			if item.time.start > time then goto continue end
+			local delta = (time - item.time.start) / (item.time.stop - item.time.start)
+			local endx, endy
+			if item.x1 < item.x2 then
+				endx = math.min(item.x1 + delta*(item.x2 - item.x1), item.x2)
+			else
+				endx = math.max(item.x1 + delta*(item.x2 - item.x1), item.x2)
+			end
+			if item.y1 < item.y2 then
+				endy = math.min(item.y1 + delta*(item.y2 - item.y1), item.y2)
+			else
+				endy = math.max(item.y1 + delta*(item.y2 - item.y1), item.y2)
+			end
+			draw_quad(toff + item.x1, item.y1, toff + endx, endy, toff + endx, endy + item.h, toff + item.x1, item.y1 + item.h)
 		end
+		::continue::
 	end
 
 	return false
