@@ -356,6 +356,9 @@ local dispatch1 = {
 			staff1[data.name] = {}
 		end
 		curname = data.name
+
+		-- mark cross staff beams for special treatment later
+		if inbeam then beamednotes.cross = true end
 	end,
 	changetime = function(data)
 		local timesig = {kind="time", num=data.num, denom=data.denom}
@@ -775,7 +778,7 @@ for _, notes in ipairs(beams) do
 	local y0s = notes[1].note.stemy
 	local yn = notes[#notes].note.stemy + extents[notes[#notes].note.staff].yoff
 	local m = (yn - y0) / (notes[#notes].note.stemx - x0)
-	if notes.stemdir == 1 then
+	if notes.stemdir == 1 and not notes.cross then
 		notes[1].note.stem.y2 = y0s + 7*(notes.maxbeams - 2) + 5
 	end
 	for i, entry in ipairs(notes) do
@@ -791,17 +794,17 @@ for _, notes in ipairs(beams) do
 		if entry.note.stemdir == 1 then
 			first = beamspace*(notes.maxbeams - 2)
 			last = beamspace*(notes.maxbeams - n - 1)
-			if entry.note.staff ~= notes[1].note.staff then
+			if extents[entry.note.staff].yoff < extents[notes[1].note.staff].yoff then
 				entry.note.stem.y2 = y0 + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight
 			else
 				entry.note.stem.y2 = y0s + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight
 			end
 			inc = -beamspace
 		else
-			if entry.note.staff ~= notes[1].note.staff then
-				entry.note.stem.y2 = y0s + m*(x2 - x0)
+			if extents[entry.note.staff].yoff > extents[notes[1].note.staff].yoff then
+				entry.note.stem.y2 = y0s + m*(x2 - x0) - extents[entry.note.staff].yoff
 			else
-				entry.note.stem.y2 = y0 + m*(x2 - x0)
+				entry.note.stem.y2 = y0s + m*(x2 - x0)
 			end
 			first = 0
 			last = beamspace*(n-1)
@@ -813,7 +816,11 @@ for _, notes in ipairs(beams) do
 			local starttime, stoptime
 			if note.time then stoptime = note.time + .25 else stoptime = nil end
 			if note.time then starttime = notes[i-1].note.time + .25 else starttime = nil end
-			table.insert(extra3, {kind="beamseg", x1=x1 - 0.5 - extent.xmin, x2=x2 - extent.xmin, y1=y0 + m*(x1 - x0) + yoff - extent.ymin, y2=y0 + m*(x2 - x0) + yoff - extent.ymin, h=beamheight, time={start=starttime, stop=stoptime}})
+			if entry.note.stemdir ~= 1 and notes.cross then
+				table.insert(extra3, {kind="beamseg", x1=x1 - 0.5 - extent.xmin, x2=x2 - extent.xmin, y1=y0 + m*(x1 - x0) + yoff + 2*beamheight - beamspace - extent.ymin, y2=y0 + m*(x2 - x0) + yoff + 2*beamheight - beamspace - extent.ymin, h=beamheight, time={start=starttime, stop=stoptime}})
+			else
+				table.insert(extra3, {kind="beamseg", x1=x1 - 0.5 - extent.xmin, x2=x2 - extent.xmin, y1=y0 + m*(x1 - x0) + yoff - extent.ymin, y2=y0 + m*(x2 - x0) + yoff - extent.ymin, h=beamheight, time={start=starttime, stop=stoptime}})
+			end
 		end
 		::continue::
 	end
