@@ -779,7 +779,9 @@ for _, notes in ipairs(beams) do
 	local yn = notes[#notes].note.stemy + extents[notes[#notes].note.staff].yoff
 	local m = (yn - y0) / (notes[#notes].note.stemx - x0)
 	if notes.stemdir == 1 and not notes.cross then
-		notes[1].note.stem.y2 = y0s + 7*(notes.maxbeams - 2) + 5
+		notes[1].note.stem.y2 = y0s + 7*(notes.maxbeams - 2) + beamheight
+	elseif notes.cross then
+		notes[1].note.stem.y2 = y0s + 7*(notes.maxbeams - 2) + 2*beamheight - beamspace
 	end
 	for i, entry in ipairs(notes) do
 		if i == 1 then goto continue end
@@ -802,7 +804,7 @@ for _, notes in ipairs(beams) do
 			inc = -beamspace
 		else
 			if extents[entry.note.staff].yoff > extents[notes[1].note.staff].yoff then
-				entry.note.stem.y2 = y0s + m*(x2 - x0) - extents[entry.note.staff].yoff
+				entry.note.stem.y2 = y0s + m*(x2 - x0) - extents[entry.note.staff].yoff + 2*beamheight - beamspace
 			else
 				entry.note.stem.y2 = y0s + m*(x2 - x0)
 			end
