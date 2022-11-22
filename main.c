@@ -17,6 +17,9 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
+#define WIDTH 854
+#define HEIGHT 480
+
 cairo_t *cr;
 FT_Face face;
 cairo_font_face_t *cface;
@@ -173,7 +176,7 @@ main(int argc, char *argv[])
 	lua_setglobal(L, "draw_quad");
 	lua_pushcfunction(L, glyph_extents);
 	lua_setglobal(L, "glyph_extents");
-	lua_pushnumber(L, 854);
+	lua_pushnumber(L, WIDTH);
 	lua_setglobal(L, "framewidth");
 	FT_Library library;
 	int error = FT_Init_FreeType(&library);
@@ -260,8 +263,8 @@ main(int argc, char *argv[])
 	// suggested bitrates: https://www.videoproc.com/media-converter/bitrate-setting-for-h264.htm
 	c->codec_id = codec->id;
 	c->bit_rate = 2500*1000;
-	c->width = 854;
-	c->height = 480;
+	c->width = WIDTH;
+	c->height = HEIGHT;
 	c->time_base.num = 1;
 	c->time_base.den = 30;
 	c->framerate.num = 30;
@@ -285,7 +288,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, 854, 480);
+	surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, WIDTH, HEIGHT);
 	cr = cairo_create(surface);
 
 	cairo_set_font_face(cr, cface);
@@ -329,7 +332,7 @@ main(int argc, char *argv[])
 	while (!done) {
 		/* fill with white */
 		cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
-		cairo_rectangle(cr, 0, 0, 854, 480);
+		cairo_rectangle(cr, 0, 0, WIDTH, HEIGHT);
 		cairo_fill(cr);
 		// draw frame
 		lua_getglobal(L, "drawframe");
@@ -345,8 +348,8 @@ main(int argc, char *argv[])
 			return 1;
 		}
 
-		for (int y = 0; y < 480; y++) {
-			for (int x = 0; x < 854; x++) {
+		for (int y = 0; y < HEIGHT; y++) {
+			for (int x = 0; x < WIDTH; x++) {
 				int srcoffset = cairo_image_surface_get_stride(surface) * y + 4*x;
 				uint32_t val = *(uint32_t *)(image_data + srcoffset);
 				// we are assuming RGB24 here
