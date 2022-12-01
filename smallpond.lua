@@ -163,18 +163,31 @@ local commands = {
 				goto start
 			end
 
-			-- grace (untimed precursor)
-			local s, e = string.find(text, "^%b{}", i)
+			-- grouping (grace or tuplet)
+			local s, e, f = string.find(text, "^(%g*)%b{}", i)
 			if s then
 				local notes = {}
+				local grace = false
+
+				if string.find(f, 'g', 1, true) then
+					grace = true
+				end
+
+				local tn, td = string.match(f, 't(%d+)/(%d+)', 1)
+				assert(not not tn == not not td)
+				if not tn then
+					tn = 1
+					td = 1
+				end
+
 				-- TODO: deal with notegroups
-				i = i + 1
-				while i <= e - 1 do
+				i = i + #f + 1
+				while i <= e - 2 do
 					i = i + #(string.match(text, "^%s*", i) or "")
 					if i >= #text then return i end
 					i, note = parsenote(text, i)
 					i, col = parsenotecolumn(text, i)
-					table.insert(voice, {command="newnotegroup", count=col.count, stemdir=col.stemdir, beam=col.beam, dot=col.dot, grace=true, notes={[1] = note}})
+					table.insert(voice, {command="newnotegroup", count=col.count, stemdir=col.stemdir, beam=col.beam, dot=col.dot, tuplet=td/tn, grace=grace, notes={[1] = note}})
 				end
 				i = e + 1
 				goto start
@@ -304,6 +317,7 @@ local dispatch1 = {
 		if data.dot then
 			incr = incr + (1 / (2*data.count))
 		end
+		if data.tuplet then incr = incr * data.tuplet end
 
 		local stemlen
 		if data.grace then
