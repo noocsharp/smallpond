@@ -380,7 +380,6 @@ local dispatch1 = {
 		table.insert(staff1[curname], timesig)
 	end,
 	barline = function(data)
-		table.insert(staff1[curname], {kind="barline"})
 		timings[time].barline = true
 		lastnote = nil
 	end,
