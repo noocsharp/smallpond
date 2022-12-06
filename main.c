@@ -20,6 +20,8 @@
 #define WIDTH 854
 #define HEIGHT 480
 
+int luaopen_qmath(lua_State *L);
+
 cairo_t *cr;
 FT_Face face;
 cairo_font_face_t *cface;
@@ -166,6 +168,13 @@ main(int argc, char *argv[])
 {
 	lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
+
+	// load lqmath
+	lua_newtable(L);
+	luaopen_qmath(L);
+	lua_setglobal(L, "Q");
+
+	// load drawing primitives
 	lua_pushcfunction(L, draw_glyph);
 	lua_setglobal(L, "draw_glyph");
 	lua_pushcfunction(L, draw_circle);
