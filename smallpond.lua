@@ -575,7 +575,7 @@ local staff3ify = function(timing, el, staff)
 			end
 		end
 
-		if el.length == 8 and el.beamed == 0 then
+		if el.length == 8 and not el.beamgroup then
 			if el.stemdir == 1 then
 				local fx, fy = glyph_extents(Glyph["flag8thDown"])
 				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], size=glyphsize, x=altoffset + preoffset + rx, y=highheight + 3.5*em, time={start=stemstoptime}})
