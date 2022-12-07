@@ -815,6 +815,9 @@ for _, notes in ipairs(beams) do
 		if notes[1].note.stemdir == -1 then
 			notes[1].note.stem.y2 = notes[1].note.stem.y2 - beamspace * (notes.maxbeams - 1) + beamheight
 		end
+		if notes[1].note.stemdir == 1 and notes[2] and notes[2].note.stemdir == -1 then
+			notes[1].note.stem.y2 = notes[1].note.stem.y2 + beamspace * notes.maxbeams
+		end
 	end
 
 	for i, entry in ipairs(notes) do
