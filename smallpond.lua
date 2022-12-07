@@ -187,7 +187,7 @@ local commands = {
 					if i >= #text then return i end
 					i, note = parsenote(text, i)
 					i, col = parsenotecolumn(text, i)
-					table.insert(voice, {command="newnotegroup", count=col.count, stemdir=col.stemdir, beam=col.beam, dot=col.dot, tuplet=td/tn, grace=grace, notes={[1] = note}})
+					table.insert(voice, {command="newnotegroup", count=col.count, stemdir=col.stemdir, beam=col.beam, dot=col.dot, tuplet=Q.new(td)/tn, grace=grace, notes={[1] = note}})
 				end
 				i = e + 1
 				goto start
@@ -272,13 +272,26 @@ end
 f = assert(io.open("score.sp"))
 parse(f:read("*a"))
 
-local time = 0 -- time in increments of denom
+local time = Q.new(0)
 local octave = 0
 local clef = Clef.treble
 local lastnote = nil
 local staff1 = {}
 local points = {}
-local pointthere = {}
+local pointindices = {}
+
+function point(t)
+	for k, v in pairs(pointindices) do
+		if t == k then
+			return v
+		end
+	end
+
+	table.insert(points, t)
+	pointindices[t] = #points
+	return pointindices[t]
+end
+
 local timings = {}
 local curname
 local inbeam = false
@@ -311,11 +324,12 @@ local dispatch1 = {
 			if maxtime and note.time and note.time > maxtime then maxtime = note.time end
 		end
 
-		if flipped and maxtime then timings[time].flipped = true end
+		local index = point(time)
+		if flipped and maxtime then timings[index].flipped = true end
 
-		local incr = 1 / data.count
+		local incr = Q.new(1) / Q.new(data.count)
 		if data.dot then
-			incr = incr + (1 / (2*data.count))
+			incr = 3*incr / 2
 		end
 		if data.tuplet then incr = incr * data.tuplet end
 
@@ -349,10 +363,11 @@ local dispatch1 = {
 
 		table.insert(staff1[curname], note)
 
+		local index = point(time)
 		if note.grace then
-			table.insert(timings[time].staffs[curname].pre, note)
+			table.insert(timings[index].staffs[curname].pre, note)
 		else
-			table.insert(timings[time].staffs[curname].on, note)
+			table.insert(timings[index].staffs[curname].on, note)
 			time = time + incr
 		end
 		lastnote = note
@@ -360,7 +375,8 @@ local dispatch1 = {
 	changeclef = function(data)
 		local class = assert(Clef[data.kind])
 		local clefitem = {kind="clef", class=class}
-		timings[time].staffs[curname].clef = clefitem
+		local index = point(time)
+		timings[index].staffs[curname].clef = clefitem
 		table.insert(staff1[curname], clefitem)
 		clef = class
 		octave = class.defoctave
@@ -376,28 +392,27 @@ local dispatch1 = {
 	end,
 	changetime = function(data)
 		local timesig = {kind="time", num=data.num, denom=data.denom}
-		timings[time].staffs[curname].timesig = timesig
+		local index = point(time)
+		timings[index].staffs[curname].timesig = timesig
 		table.insert(staff1[curname], timesig)
 	end,
 	barline = function(data)
-		timings[time].barline = true
+		local index = point(time)
+		timings[index].barline = true
 		lastnote = nil
 	end,
 	srest = function(data)
 		table.insert(staff1[curname], {kind='srest', length=data.count, time=time})
-		time = time + 1 / data.count
+		time = time + 1 / Q.new(data.count)
 	end,
 }
 
 for _, voice in ipairs(voices) do
-	time = 0
+	time = Q.new(0)
 	for _, item in ipairs(voice) do
-		if not pointthere[time] then
-			pointthere[time] = true
-			table.insert(points, time)
-			timings[time] = {staffs={}}
-		end
-		if curname and not timings[time].staffs[curname] then timings[time].staffs[curname] = {pre={}, on={}, post={}} end
+		local index = point(time)
+		if not timings[index] then timings[index] = {staffs={}} end
+		if curname and not timings[index].staffs[curname] then timings[index].staffs[curname] = {pre={}, on={}, post={}} end
 		assert(dispatch1[item.command])(item)
 	end
 end
@@ -448,6 +463,7 @@ end
 
 local staff3ify = function(timing, el, staff)
 	local xdiff
+	local tindex = point(timing)
 	if el.kind == "notecolumn" then
 		local glyphsize
 		if el.grace then
@@ -481,7 +497,7 @@ local staff3ify = function(timing, el, staff)
 
 		-- offset of stem if a head is drawn on opposite side of stem
 		local altoffset = 0
-		if timings[timing].flipped then
+		if timings[tindex].flipped then
 			altoffset = w - 1.2
 		end
 
@@ -575,12 +591,12 @@ local staff3ify = function(timing, el, staff)
 	elseif el.kind == "srest" then
 		xdiff = 0
 	elseif el.kind == "clef" then
-		table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff, time={start=timing, stop=timing+1}})
+		table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff, time={start=Q.tonumber(timing), stop=Q.tonumber(timing)+1}})
 		xdiff =  30
 	elseif el.kind == "time" then
 		-- TODO: draw multidigit time signatures properly
-		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=x, y=em, time={start=timing, stop=timing+1}})
-		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=x, y=3*em, time={start=timing, stop=timing+1}})
+		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=x, y=em, time={start=Q.tonumber(timing), stop=Q.tonumber(timing)+1}})
+		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=x, y=3*em, time={start=Q.tonumber(timing), stop=Q.tonumber(timing)+1}})
 		xdiff =  30
 	end
 
@@ -590,7 +606,8 @@ end
 local rtimings = {}
 local snappoints = {}
 for _, time in ipairs(points) do
-	local todraw = timings[time].staffs
+	local tindex = point(time)
+	local todraw = timings[tindex].staffs
 
 	-- clef
 	local xdiff = 0
@@ -616,7 +633,7 @@ for _, time in ipairs(points) do
 	x = x + xdiff
 	xdiff = 0
 
-	if timings[time].barline then
+	if timings[tindex].barline then
 		table.insert(extra3, {kind='barline', x=x+25})
 		x = x + 10
 	end
