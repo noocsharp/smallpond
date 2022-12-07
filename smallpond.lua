@@ -297,6 +297,7 @@ local curname
 local inbeam = false
 local beam
 local beams = {}
+local beamednotes
 -- first-order placement
 local dispatch1 = {
 	newnotegroup = function(data)
@@ -557,7 +558,7 @@ local staff3ify = function(timing, el, staff)
 		-- stem
 		local stemstoptime
 		if el.stemdir then
-			if el.time then stemstoptime = el.time + .25 else stopstoptime = nil end
+			if el.time then stemstoptime = el.time + .25 else stemstoptime = nil end
 			if el.stemdir == -1 then
 				-- stem up
 				-- advance width for bravura is 1.18 - .1 for stem width
@@ -575,6 +576,7 @@ local staff3ify = function(timing, el, staff)
 			end
 		end
 
+		-- flag
 		if el.length == 8 and not el.beamgroup then
 			if el.stemdir == 1 then
 				local fx, fy = glyph_extents(Glyph["flag8thDown"])
@@ -640,7 +642,7 @@ for _, time in ipairs(points) do
 
 	-- prebeat
 	for staff, vals in pairs(todraw) do
-		if #vals.on == 0 then goto nextstaff end
+		if #vals.pre == 0 then goto nextstaff end
 		for _, el in ipairs(vals.pre) do
 			local diff = staff3ify(time, el, staff)
 			if el.beamref then staff3ify(time, el.beamref, staff) end
