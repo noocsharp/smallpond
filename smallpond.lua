@@ -563,13 +563,11 @@ local staff3ify = function(timing, el, staff)
 				-- stem up
 				-- advance width for bravura is 1.18 - .1 for stem width
 				el.stemx = w + rx - 1.08 + preoffset + altoffset
-				el.stemy = lowheight -.168*em - el.stemlen*em
 				local stem = {kind="line", t=1, x1=el.stemx, y1=highheight - .168*em, x2=el.stemx, y2=lowheight -.168*em - el.stemlen*em, time={start=el.time, stop=stemstoptime}}
 				el.stem = stem
 				table.insert(staff3[staff], el.stem)
 			else
 				el.stemx = rx + .5 + preoffset + altoffset
-				el.stemy = lowheight + el.stemlen*em
 				local stem = {kind="line", t=1, x1=el.stemx, y1=lowheight + .168*em, x2=el.stemx, y2=highheight + el.stemlen*em, time={start=el.time, stop=stemstoptime}}
 				el.stem = stem
 				table.insert(staff3[staff], stem)
@@ -806,9 +804,9 @@ for _, notes in ipairs(beams) do
 		beamspace = 7
 	end
 	local x0 = notes[1].note.stemx + .5
-	local y0 = notes[1].note.stemy + extents[notes[1].note.staff].yoff - extents[notes[1].note.staff].ymin
-	local y0s = notes[1].note.stemy
-	local yn = notes[#notes].note.stemy + extents[notes[#notes].note.staff].yoff - extents[notes[#notes].note.staff].ymin
+	local y0 = notes[1].note.stem.y2 + extents[notes[1].note.staff].yoff - extents[notes[1].note.staff].ymin
+	local y0s = notes[1].note.stem.y2
+	local yn = notes[#notes].note.stem.y2 + extents[notes[#notes].note.staff].yoff - extents[notes[#notes].note.staff].ymin
 
 	local m = (yn - y0) / (notes[#notes].note.stemx + .5 - x0)
 	if notes.cross then
