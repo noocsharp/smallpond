@@ -892,7 +892,7 @@ function drawframe(time)
 	local delta = xdiff * (time - snappoints[snapidx - 1]) / (snappoints[snapidx] - snappoints[snapidx - 1])
 	local toff = toff_base - delta
 
-	if time > lastpoint + 3 then
+	if time > lastpoint + 10 then
 		return true
 	end
 
@@ -953,7 +953,12 @@ function drawframe(time)
 			draw_line(1, toff + item.x, -firstymin, toff + item.x, lastymin + 4*em)
 		elseif item.kind == "beamseg" then
 			if item.time.start > time then goto continue end
-			local delta = (time - item.time.start) / (item.time.stop - item.time.start)
+			local delta
+			if item.time.stop == item.time.start then
+				delta = 1
+			else
+				delta = (time - item.time.start) / (item.time.stop - item.time.start)
+			end
 			local endx, endy
 			if item.x1 < item.x2 then
 				endx = math.min(item.x1 + delta*(item.x2 - item.x1), item.x2)
