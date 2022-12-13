@@ -107,10 +107,13 @@ draw_glyph(lua_State *L)
 int
 glyph_extents(lua_State *L)
 {
-	unsigned int val = lua_tonumber(L, -1);
+	unsigned int val = lua_tonumber(L, -2);
+	double size = lua_tonumber(L, -1);
 	unsigned int index = FT_Get_Char_Index(face, val);
 	cairo_glyph_t glyph = {index, 0, 0};
 	cairo_text_extents_t extents;
+	cairo_set_font_face(cr, cface);
+	cairo_set_font_size(cr, size);
 	cairo_glyph_extents(cr, &glyph, 1, &extents);
 
 	lua_pushnumber(L, extents.width);

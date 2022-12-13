@@ -491,7 +491,7 @@ local staff3ify = function(timing, el, staff)
 			glyph = Glyph["noteheadBlack"]
 		end
 
-		local w, h = glyph_extents(glyph)
+		local w, h = glyph_extents(glyph, glyphsize)
 
 		local preoffset = 0
 
@@ -583,11 +583,11 @@ local staff3ify = function(timing, el, staff)
 		-- flag
 		if el.length == 8 and not el.beamgroup then
 			if el.stemdir == 1 then
-				local fx, fy = glyph_extents(Glyph["flag8thDown"])
+				local fx, fy = glyph_extents(Glyph["flag8thDown"], glyphsize)
 				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thDown"], size=glyphsize, x=altoffset + preoffset + rx, y=highheight + 3.5*em, time={start=stemstoptime}})
 			else
 				-- TODO: move glyph extents to a precalculated table or something
-				local fx, fy = glyph_extents(Glyph["flag8thUp"])
+				local fx, fy = glyph_extents(Glyph["flag8thUp"], glyphsize)
 				table.insert(staff3[staff], {kind="glyph", glyph=Glyph["flag8thUp"], size=glyphsize, x=altoffset + el.stemx - .48, y=lowheight -.168*em - 3.5*em, time={start=stemstoptime}})
 				xdiff = xdiff + fx
 			end
@@ -685,7 +685,7 @@ for _, staff in pairs(stafforder) do
 	extents[staff] = {xmin=0, ymin=0, xmax=0, ymax=0}
 	for i, d in ipairs(items) do
 		if d.kind == "glyph" then
-			local w, h = glyph_extents(d.glyph)
+			local w, h = glyph_extents(d.glyph, 32)
 			if d.x - w < extents[staff].xmin then
 				extents[staff].xmin = d.x - w
 			elseif d.x + w > extents[staff].xmax then
@@ -797,7 +797,7 @@ for i, staff in pairs(stafforder) do
 
 	extent.yoff = yoff
 	-- HACK: bring staffs closer together
-	yoff = yoff + extent.ymax - extent.ymin - 50
+	yoff = yoff + extent.ymax - extent.ymin
 end
 
 -- draw beam (and adjust stems) after all previous notes already have set values
