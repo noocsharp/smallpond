@@ -796,7 +796,8 @@ for i, staff in pairs(stafforder) do
 	end
 
 	extent.yoff = yoff
-	yoff = yoff + extent.ymax - extent.ymin
+	-- HACK: bring staffs closer together
+	yoff = yoff + extent.ymax - extent.ymin - 50
 end
 
 -- draw beam (and adjust stems) after all previous notes already have set values
