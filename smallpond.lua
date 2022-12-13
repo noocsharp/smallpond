@@ -302,7 +302,13 @@ local beamednotes
 local dispatch1 = {
 	newnotegroup = function(data)
 		local heads = {}
-		local beamcount = math.log(data.count) / math.log(2) - 2
+		local realbeamcount = math.log(data.count) / math.log(2) - 2
+		local beamcount
+		if inbeam then
+			beamcount = math.min(realbeamcount, beamednotes[#beamednotes].realcount)
+		else
+			beamcount = realbeamcount
+		end
 		local maxtime
 		local lasthead
 		local flipped = false
@@ -345,7 +351,7 @@ local dispatch1 = {
 			assert(not inbeam)
 			beamednotes = {}
 			table.insert(beams, beamednotes)
-			table.insert(beamednotes, {note=note, count=beamcount})
+			table.insert(beamednotes, {note=note, count=beamcount, realcount=realbeamcount})
 			if data.grace then beamednotes.grace = data.grace end
 			beamednotes.maxbeams = beamcount
 			note.beamgroup = beamednotes
@@ -353,12 +359,12 @@ local dispatch1 = {
 		elseif data.beam == -1 then
 			assert(inbeam)
 			inbeam = false
-			table.insert(beamednotes, {note=note, count=beamcount})
+			table.insert(beamednotes, {note=note, count=beamcount, realcount=realbeamcount})
 			beamednotes.maxbeams = math.max(beamednotes.maxbeams, beamcount)
 			note.beamgroup = beamednotes
 		elseif inbeam then
 			beamednotes.maxbeams = math.max(beamednotes.maxbeams, beamcount)
-			table.insert(beamednotes, {note=note, count=beamcount})
+			table.insert(beamednotes, {note=note, count=beamcount, realcount=realbeamcount})
 			note.beamgroup = beamednotes
 		end
 
