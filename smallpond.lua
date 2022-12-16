@@ -662,7 +662,8 @@ for _, time in ipairs(points) do
 		if #vals.on == 0 then goto nextstaff end
 		local diff
 		for _, el in ipairs(vals.on) do
-			if el.time and el.time > maxtime then maxtime = el.time end
+			-- HACK: don't hardcode staff name
+			if staff == "low" and el.time and el.time > maxtime then maxtime = el.time end
 			diff = staff3ify(time, el, staff)
 			if el.beamref then staff3ify(time, el.beamref, staff) end
 		end
