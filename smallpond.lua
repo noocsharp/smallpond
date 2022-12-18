@@ -661,7 +661,8 @@ for _, time in ipairs(points) do
 	xdiff = 0
 
 	if timings[tindex].barline then
-		table.insert(extra3, {kind='barline', x=x+25})
+		local time = timings[tindex].mintime or 0
+		table.insert(extra3, {kind='barline', x=x+25, time={start=time - 1, stop=time}})
 		x = x + 10
 	end
 
@@ -978,7 +979,13 @@ function drawframe(time)
 	-- draw barlines
 	for staff, item in ipairs(extra3) do
 		if item.kind == 'barline' then
-			draw_line(1, toff + item.x, -firstymin, toff + item.x, lastymin + 4*em)
+			if item.time.start > time then goto continue end
+			local y1 = -firstymin
+			local y2 = lastymin + 4*em
+			local delta = (time - item.time.start) / (item.time.stop - item.time.start)
+			local endy = math.min(y1 + delta*(y2 - y1), y2)
+
+			draw_line(1, toff + item.x, y1, toff + item.x, endy)
 		elseif item.kind == "beamseg" then
 			if item.time.start > time then goto continue end
 			local delta
