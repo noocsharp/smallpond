@@ -293,6 +293,7 @@ function point(t)
 end
 
 local timings = {}
+local curclef
 local curname
 local inbeam = false
 local beam
@@ -309,7 +310,7 @@ local dispatch1 = {
 		else
 			beamcount = realbeamcount
 		end
-		local maxtime
+		local maxtime, mintime
 		local lasthead
 		local flipped = false
 		for _, note in ipairs(data.notes) do
@@ -329,10 +330,19 @@ local dispatch1 = {
 			table.insert(heads, head)
 			if note.time and not maxtime then maxtime = note.time end
 			if maxtime and note.time and note.time > maxtime then maxtime = note.time end
+
+			if note.time and not mintime then mintime = note.time end
+			if maxtime and note.time and note.time < maxtime then maxtime = note.time end
 		end
+
 
 		local index = point(time)
 		if flipped and maxtime then timings[index].flipped = true end
+		if not timings[index].mintime then
+			timings[index].mintime = mintime
+		else
+			timings[index].mintime = math.min(mintime, timings[index].mintime)
+		end
 
 		local incr = Q.new(1) / Q.new(data.count)
 		if data.dot then
@@ -381,10 +391,20 @@ local dispatch1 = {
 	end,
 	changeclef = function(data)
 		local class = assert(Clef[data.kind])
-		local clefitem = {kind="clef", class=class}
-		local index = point(time)
-		timings[index].staffs[curname].clef = clefitem
-		table.insert(staff1[curname], clefitem)
+		if not curclef[curname] then
+			curclef[curname] = data.kind
+			local clefitem = {kind="clef", class=class}
+			local index = point(time)
+			timings[index].staffs[curname].clef = clefitem
+			table.insert(staff1[curname], clefitem)
+		elseif curclef[curname] ~= data.kind then
+			local class = assert(Clef[data.kind])
+			local clefitem = {kind="clef", class=class}
+			local index = point(time)
+			timings[index].staffs[curname].clef = clefitem
+			table.insert(staff1[curname], clefitem)
+		end
+
 		clef = class
 		octave = class.defoctave
 	end,
@@ -415,6 +435,7 @@ local dispatch1 = {
 }
 
 for _, voice in ipairs(voices) do
+	curclef = {}
 	time = Q.new(0)
 	for _, item in ipairs(voice) do
 		local index = point(time)
@@ -597,12 +618,12 @@ local staff3ify = function(timing, el, staff)
 	elseif el.kind == "srest" then
 		xdiff = 0
 	elseif el.kind == "clef" then
-		table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, x=x, y=el.class.yoff, time={start=Q.tonumber(timing), stop=Q.tonumber(timing)+1}})
+		table.insert(staff3[staff], {kind="glyph", glyph=el.class.glyph, size=32, x=x, y=el.class.yoff, time={start=timings[tindex].mintime, stop=timings[tindex].mintime + 1}})
 		xdiff =  30
 	elseif el.kind == "time" then
 		-- TODO: draw multidigit time signatures properly
-		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], x=x, y=em, time={start=Q.tonumber(timing), stop=Q.tonumber(timing)+1}})
-		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], x=x, y=3*em, time={start=Q.tonumber(timing), stop=Q.tonumber(timing)+1}})
+		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.num], size=32, x=x, y=em, time={start=timings[tindex].mintime, stop=timings[tindex].mintime + 1}})
+		table.insert(staff3[staff], {kind="glyph", glyph=numerals[el.denom], size=32, x=x, y=3*em, time={start=timings[tindex].mintime, stop=timings[tindex].mintime + 1}})
 		xdiff =  30
 	end
 
@@ -797,7 +818,6 @@ for i, staff in pairs(stafforder) do
 	end
 
 	extent.yoff = yoff
-	-- HACK: bring staffs closer together
 	yoff = yoff + extent.ymax - extent.ymin
 end
 
