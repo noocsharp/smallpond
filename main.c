@@ -72,7 +72,7 @@ draw_curve(lua_State *L)
 	split_cubic(t, 0, 0, x1 - x0, y1 - y0, x2 - x0, y2 - y0, &q0x, &q0y, &r0x, &r0y, &bx, &by);
 	cairo_move_to(cr, x0, y0);
 	cairo_rel_curve_to(cr, q0x, q0y, r0x, r0y, bx, by);
-	split_cubic(t, 0, 1, x1 - x0, y1 + 5 - y0, x2 - x0, y2 + 1 - y0, &q0x, &q0y, &r0x, &r0y, &bx, &by);
+	split_cubic(t, 0, 1, x1 - x0, y1 + 3 - y0, x2 - x0, y2 + 1 - y0, &q0x, &q0y, &r0x, &r0y, &bx, &by);
 	cairo_rel_line_to(cr, 0, 1);
 	cairo_rel_curve_to(cr, r0x - bx, r0y - by, q0x - bx, q0y - by, q0x - bx, q0y - by);
 	cairo_line_to(cr, x0, y0);
