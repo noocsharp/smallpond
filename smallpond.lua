@@ -840,7 +840,7 @@ end
 
 for _, tie in pairs(ties) do
 	local yoff = extents[tie.staff].yoff - extents[tie.staff].ymin
-	table.insert(extra3, {kind="curve", x0=tie.start.glyph.x + tie.start.glyph.width + 5, y0=tie.start.glyph.y + yoff, x2=tie.stop.glyph.x, y2=tie.stop.glyph.y + yoff, time={start=tie.start.glyph.time.start, stop=tie.stop.glyph.time.start}})
+	table.insert(extra3, {kind="curve", x0=tie.start.glyph.x + tie.start.glyph.width + 10, y0=tie.start.glyph.y + yoff, x2=tie.stop.glyph.x + 10, y2=tie.stop.glyph.y + yoff, time={start=tie.start.glyph.time.start, stop=tie.stop.glyph.time.start}})
 end
 
 -- draw beam (and adjust stems) after all previous notes already have set values
