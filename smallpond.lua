@@ -302,6 +302,7 @@ local beams = {}
 local beamednotes
 local unterminated_ties = {}
 local ties = {}
+local lastbarline
 -- first-order placement
 local dispatch1 = {
 	newnotegroup = function(data)
@@ -430,6 +431,7 @@ local dispatch1 = {
 	barline = function(data)
 		local index = point(time)
 		timings[index].barline = true
+		lastbarline = index
 		lastnote = nil
 	end,
 	srest = function(data)
@@ -669,7 +671,11 @@ for _, time in ipairs(points) do
 
 	if timings[tindex].barline then
 		local time = timings[tindex].mintime or 0
-		table.insert(extra3, {kind='barline', x=x+25, time={start=time - 1, stop=time}})
+		if tindex == lastbarline then
+			table.insert(extra3, {kind='barline', x=x+25, last=true, time={start=time - 1, stop=time}})
+		else
+			table.insert(extra3, {kind='barline', x=x+25, time={start=time - 1, stop=time}})
+		end
 		x = x + 10
 	end
 
@@ -910,7 +916,11 @@ for staff, item in ipairs(extra3) do
 		if item.x < xmin then
 			xmin = item.x
 		elseif item.x > xmax then
-			xmax = item.x
+			if item.last then
+				xmax = item.x + 7
+			else
+				xmax = item.x
+			end
 		end
 	end
 end
@@ -998,6 +1008,9 @@ function drawframe(time)
 			local endy = math.min(y1 + delta*(y2 - y1), y2)
 
 			draw_line(1, toff + item.x, y1, toff + item.x, endy)
+			if item.last then
+			draw_line(4, 5 + toff + item.x, y1, 5 + toff + item.x, endy)
+			end
 		elseif item.kind == "curve" then
 			if item.time.start > time then goto continue end
 			local delta
