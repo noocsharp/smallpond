@@ -295,7 +295,6 @@ function point(t)
 end
 
 local timings = {}
-local curclef
 local curname
 local inbeam = false
 local beam
@@ -405,19 +404,10 @@ local dispatch1 = {
 	end,
 	changeclef = function(data)
 		local class = assert(Clef[data.kind])
-		if not curclef[curname] then
-			curclef[curname] = data.kind
-			local clefitem = {kind="clef", class=class}
-			local index = point(time)
-			timings[index].staffs[curname].clef = clefitem
-			table.insert(staff1[curname], clefitem)
-		elseif curclef[curname] ~= data.kind then
-			local class = assert(Clef[data.kind])
-			local clefitem = {kind="clef", class=class}
-			local index = point(time)
-			timings[index].staffs[curname].clef = clefitem
-			table.insert(staff1[curname], clefitem)
-		end
+		local clefitem = {kind="clef", class=class}
+		local index = point(time)
+		timings[index].staffs[curname].clef = clefitem
+		table.insert(staff1[curname], clefitem)
 
 		clef = class
 		octave = class.defoctave
@@ -449,7 +439,6 @@ local dispatch1 = {
 }
 
 for _, voice in ipairs(voices) do
-	curclef = {}
 	time = Q.new(0)
 	for _, item in ipairs(voice) do
 		local index = point(time)
@@ -648,6 +637,7 @@ end
 
 local rtimings = {}
 local snappoints = {}
+local curclef = {}
 for _, time in ipairs(points) do
 	local tindex = point(time)
 	local todraw = timings[tindex].staffs
@@ -655,9 +645,10 @@ for _, time in ipairs(points) do
 	-- clef
 	local xdiff = 0
 	for staff, vals in pairs(todraw) do
-		if vals.clef then
+		if vals.clef and (vals.clef.class ~= curclef[staff]) then
 			local diff = staff3ify(time, vals.clef, staff)
 			if diff > xdiff then xdiff = diff end
+			curclef[staff] = vals.clef.class
 		end
 	end
 
