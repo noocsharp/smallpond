@@ -119,7 +119,7 @@ local commands = {
 		end
 		local parsenote = function(text, start)
 			-- TODO: should we be more strict about accidentals and stem orientations on rests?
-			local s, e, time, note, acc, shift = string.find(text, "^(%d*%.?%d*)([abcdefgs])([fns]?)([,']*)", start)
+			local s, e, time, note, acc, shift, tie = string.find(text, "^(%d*%.?%d*)([abcdefgs])([fns]?)([,']*)(~?)", start)
 			if note then
 				local out
 				if note == 's' then
@@ -131,6 +131,8 @@ local commands = {
 				local _, down = string.gsub(shift, ',', '')
 				local _, up = string.gsub(shift, "'", '')
 				out.shift = up - down
+
+				if #tie > 0 then out.tie = true end
 				return start + e - s + 1, out
 			end
 
@@ -299,6 +301,8 @@ local inbeam = false
 local beam
 local beams = {}
 local beamednotes
+local unterminated_ties = {}
+local ties = {}
 -- first-order placement
 local dispatch1 = {
 	newnotegroup = function(data)
@@ -333,6 +337,16 @@ local dispatch1 = {
 
 			if note.time and not mintime then mintime = note.time end
 			if maxtime and note.time and note.time < maxtime then maxtime = note.time end
+
+			if unterminated_ties[curname] and unterminated_ties[curname].y == head.y then
+				table.insert(ties, {staff=curname, start=unterminated_ties[curname], stop=head})
+				unterminated_ties[curname] = nil
+			end
+
+			if note.tie then
+				assert(unterminated_ties[curname] == nil)
+				unterminated_ties[curname] = head
+			end
 		end
 
 
@@ -538,10 +552,12 @@ local staff3ify = function(timing, el, staff)
 			if not lowheight then lowheight = ry end
 			if not highheight then highheight = ry end
 			if head.flip then
-				table.insert(staff3[staff], {kind="glyph", size=glyphsize, glyph=glyph, x=preoffset + rx, y=ry, time={start=head.time}})
+				head.glyph = {kind="glyph", width=w, size=glyphsize, glyph=glyph, x=preoffset + rx, y=ry, time={start=head.time}}
 			else
-				table.insert(staff3[staff], {kind="glyph", size=glyphsize, glyph=glyph, x=preoffset + altoffset + rx, y=ry, time={start=head.time}})
+				head.glyph = {kind="glyph", width=w, size=glyphsize, glyph=glyph, x=preoffset + altoffset + rx, y=ry, time={start=head.time}}
 			end
+			table.insert(staff3[staff], head.glyph)
+
 			if el.dot then
 				xdiff = xdiff + 5
 				table.insert(staff3[staff], {kind="circle", r=1.5, x=preoffset + altoffset + rx + w + 5, y=ry, time={start=head.time}})
@@ -822,6 +838,11 @@ for i, staff in pairs(stafforder) do
 	yoff = yoff + extent.ymax - extent.ymin
 end
 
+for _, tie in pairs(ties) do
+	local yoff = extents[tie.staff].yoff - extents[tie.staff].ymin
+	table.insert(extra3, {kind="curve", x0=tie.start.glyph.x + tie.start.glyph.width + 5, y0=tie.start.glyph.y + yoff, x2=tie.stop.glyph.x, y2=tie.stop.glyph.y + yoff, time={start=tie.start.glyph.time.start, stop=tie.stop.glyph.time.start}})
+end
+
 -- draw beam (and adjust stems) after all previous notes already have set values
 for _, notes in ipairs(beams) do
 	local beamheight, beamspace
@@ -986,6 +1007,16 @@ function drawframe(time)
 			local endy = math.min(y1 + delta*(y2 - y1), y2)
 
 			draw_line(1, toff + item.x, y1, toff + item.x, endy)
+		elseif item.kind == "curve" then
+			if item.time.start > time then goto continue end
+			local delta
+			if item.time.stop < time then
+				delta = 1
+			else
+				delta = (time - item.time.start) / (item.time.stop - item.time.start)
+			end
+			local endx = item.x0 + delta*(item.x2 - item.x0)
+			draw_curve(toff + item.x0, item.y0, toff + (item.x0 + endx) / 2, (item.y0 + item.y2) / 2 + 20, toff + endx, item.y2)
 		elseif item.kind == "beamseg" then
 			if item.time.start > time then goto continue end
 			local delta

@@ -27,6 +27,56 @@ FT_Face face;
 cairo_font_face_t *cface;
 cairo_surface_t *surface;
 
+// return control points for cubic bezier curve corresponding to
+// bezier curve that t of the way through the bezier curve produced
+// by the control points.
+
+// see https://en.wikipedia.org/wiki/B%C3%A9zier_curve#/media/File:B%C3%A9zier_3_big.svg
+// for explanation of variable names
+int
+split_cubic(double t, double x1, double y1, double x2, double y2, double x, double y, double *q0x, double *q0y, double *r0x, double *r0y, double *bx, double *by)
+{
+	*q0x = x1 * t;
+	*q0y = y1 * t;
+
+	double q1x = (x2 - x1) * t + x1;
+	double q1y = (y2 - y1) * t + y1;
+
+	double q2x = (x - x2) * t + x2;
+	double q2y = (y - y2) * t + y2;
+
+	double r1x = (q2x - q1x) * t + q1x;
+	double r1y = (q2y - q1y) * t + q1y;
+
+	*r0x = (q1x - *q0x) * t + *q0x;
+	*r0y = (q1y - *q0y) * t + *q0y;
+
+	*bx = (r1x - *r0x) * t + *r0x;
+	*by = (r1y - *r0y) * t + *r0y;
+}
+
+int
+draw_curve(lua_State *L)
+{
+	double x0 = lua_tonumber(L, -6);
+	double y0 = lua_tonumber(L, -5);
+	double x1 = lua_tonumber(L, -4);
+	double y1 = lua_tonumber(L, -3);
+	double x2 = lua_tonumber(L, -2);
+	double y2 = lua_tonumber(L, -1);
+
+	cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
+
+	cairo_curve_to(cr, x0, y0, x1, y1, x2, y2);
+	cairo_line_to(cr, x2, y2 + 1);
+	cairo_curve_to(cr, x1, y1 + 5, x0, y0 + 1, x0, y0 + 1);
+	cairo_line_to(cr, x0, y0);
+	cairo_set_line_width(cr, 1);
+	cairo_fill(cr);
+
+	return 0;
+}
+
 int
 draw_circle(lua_State *L)
 {
@@ -178,6 +228,8 @@ main(int argc, char *argv[])
 	lua_setglobal(L, "Q");
 
 	// load drawing primitives
+	lua_pushcfunction(L, draw_curve);
+	lua_setglobal(L, "draw_curve");
 	lua_pushcfunction(L, draw_glyph);
 	lua_setglobal(L, "draw_glyph");
 	lua_pushcfunction(L, draw_circle);

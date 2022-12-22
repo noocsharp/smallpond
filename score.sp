@@ -171,7 +171,7 @@
 	31.27a^16[
 	\staff high
 	\clef treble
-	31.82cs,v16 32.0fsv16 32.29a'v16 32.550csv8]
+	31.82cs,v16 32.0fsv16 32.29a'v16 32.550cs~v8]
 	32.82csv16[ 32.85av16 33.08fs,v16 33.40csv16
 	\staff low
 	\clef bass
