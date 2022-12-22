@@ -58,6 +58,7 @@ split_cubic(double t, double x1, double y1, double x2, double y2, double x, doub
 int
 draw_curve(lua_State *L)
 {
+	double t = lua_tonumber(L, -7);
 	double x0 = lua_tonumber(L, -6);
 	double y0 = lua_tonumber(L, -5);
 	double x1 = lua_tonumber(L, -4);
@@ -67,11 +68,14 @@ draw_curve(lua_State *L)
 
 	cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
 
-	cairo_curve_to(cr, x0, y0, x1, y1, x2, y2);
-	cairo_line_to(cr, x2, y2 + 1);
-	cairo_curve_to(cr, x1, y1 + 5, x0, y0 + 1, x0, y0 + 1);
+	double q0x, q0y, r0x, r0y, bx, by;
+	split_cubic(t, 0, 0, x1 - x0, y1 - y0, x2 - x0, y2 - y0, &q0x, &q0y, &r0x, &r0y, &bx, &by);
+	cairo_move_to(cr, x0, y0);
+	cairo_rel_curve_to(cr, q0x, q0y, r0x, r0y, bx, by);
+	split_cubic(t, 0, 1, x1 - x0, y1 + 5 - y0, x2 - x0, y2 + 1 - y0, &q0x, &q0y, &r0x, &r0y, &bx, &by);
+	cairo_rel_line_to(cr, 0, 1);
+	cairo_rel_curve_to(cr, r0x - bx, r0y - by, q0x - bx, q0y - by, q0x - bx, q0y - by);
 	cairo_line_to(cr, x0, y0);
-	cairo_set_line_width(cr, 1);
 	cairo_fill(cr);
 
 	return 0;

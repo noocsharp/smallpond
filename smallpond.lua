@@ -1016,7 +1016,7 @@ function drawframe(time)
 				delta = (time - item.time.start) / (item.time.stop - item.time.start)
 			end
 			local endx = item.x0 + delta*(item.x2 - item.x0)
-			draw_curve(toff + item.x0, item.y0, toff + (item.x0 + endx) / 2, (item.y0 + item.y2) / 2 + 20, toff + endx, item.y2)
+			draw_curve(delta, toff + item.x0, item.y0, toff + (item.x0 + endx) / 2, (item.y0 + item.y2) / 2 + 20, toff + endx, item.y2)
 		elseif item.kind == "beamseg" then
 			if item.time.start > time then goto continue end
 			local delta
