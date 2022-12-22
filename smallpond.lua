@@ -854,8 +854,15 @@ for _, notes in ipairs(beams) do
 	local y0 = notes[1].note.stem.y2 + extents[notes[1].note.staff].yoff - extents[notes[1].note.staff].ymin
 	local y0s = notes[1].note.stem.y2
 	local yn = notes[#notes].note.stem.y2 + extents[notes[#notes].note.staff].yoff - extents[notes[#notes].note.staff].ymin
-
 	local m = (yn - y0) / (notes[#notes].note.stemx + .5 - x0)
+
+	-- THIS IS A HACK: replace with more generic mechanism that detects overlap
+	-- this only accounts for stems pointing do
+	local stemextension = 0
+	if notes[1].count == 3 and notes[1].note.stemdir == -1 then
+		stemextension = -10
+	end
+
 	if notes.cross then
 		if notes[1].note.stemdir == -1 then
 			notes[1].note.stem.y2 = notes[1].note.stem.y2 - beamspace * (notes.maxbeams - 1) + beamheight
@@ -864,6 +871,8 @@ for _, notes in ipairs(beams) do
 			notes[1].note.stem.y2 = notes[1].note.stem.y2 + beamspace * notes.maxbeams
 		end
 	end
+
+	notes[1].note.stem.y2 = notes[1].note.stem.y2 + stemextension
 
 	for i, entry in ipairs(notes) do
 		if i == 1 then goto continue end
@@ -880,16 +889,16 @@ for _, notes in ipairs(beams) do
 			first = beamspace*(notes.maxbeams - 2)
 			last = beamspace*(notes.maxbeams - n - 1)
 			if extents[entry.note.staff].yoff < extents[notes[1].note.staff].yoff then
-				entry.note.stem.y2 = y0 + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight + extents[entry.note.staff].ymin - extents[entry.note.staff].yoff
+				entry.note.stem.y2 = y0 + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight + extents[entry.note.staff].ymin - extents[entry.note.staff].yoff + stemextension
 			else
-				entry.note.stem.y2 = y0s + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight
+				entry.note.stem.y2 = y0s + m*(x2 - x0) + 7*(notes.maxbeams - 2) + beamheight + stemextension
 			end
 			inc = -beamspace
 		else
 			if extents[entry.note.staff].yoff > extents[notes[1].note.staff].yoff then
-				entry.note.stem.y2 = y0 + m*(x2 - x0) + beamheight - extents[entry.note.staff].yoff + extents[entry.note.staff].ymin
+				entry.note.stem.y2 = y0 + m*(x2 - x0) + beamheight - extents[entry.note.staff].yoff + extents[entry.note.staff].ymin + stemextension
 			else
-				entry.note.stem.y2 = y0s + m*(x2 - x0)
+				entry.note.stem.y2 = y0s + m*(x2 - x0) + stemextension
 			end
 			first = 0
 			last = beamspace*(n-1)
@@ -902,9 +911,9 @@ for _, notes in ipairs(beams) do
 			if note.time then stoptime = note.time + .25 else stoptime = nil end
 			if note.time then starttime = notes[i-1].note.time + .25 else starttime = nil end
 			if entry.note.stemdir ~= 1 and notes.cross then
-				table.insert(extra3, {kind="beamseg", x1=x1 - 0.5 - extent.xmin, x2=x2 - extent.xmin, y1=y0 + m*(x1 - x0) + yoff, y2=y0 + m*(x2 - x0) + yoff, h=beamheight, time={start=starttime, stop=stoptime}})
+				table.insert(extra3, {kind="beamseg", x1=x1 - 0.5 - extent.xmin, x2=x2 - extent.xmin, y1=y0 + m*(x1 - x0) + yoff + stemextension, y2=y0 + m*(x2 - x0) + yoff + stemextension, h=beamheight, time={start=starttime, stop=stoptime}})
 			else
-				table.insert(extra3, {kind="beamseg", x1=x1 - 0.5 - extent.xmin, x2=x2 - extent.xmin, y1=y0 + m*(x1 - x0) + yoff, y2=y0 + m*(x2 - x0) + yoff, h=beamheight, time={start=starttime, stop=stoptime}})
+				table.insert(extra3, {kind="beamseg", x1=x1 - 0.5 - extent.xmin, x2=x2 - extent.xmin, y1=y0 + m*(x1 - x0) + yoff + stemextension, y2=y0 + m*(x2 - x0) + yoff + stemextension, h=beamheight, time={start=starttime, stop=stoptime}})
 			end
 		end
 		::continue::
