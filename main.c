@@ -17,8 +17,9 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
-#define WIDTH 854
-#define HEIGHT 480
+#define WIDTH 1280
+#define HEIGHT 720
+#define FRAMERATE 30
 
 int luaopen_qmath(lua_State *L);
 
@@ -334,8 +335,8 @@ main(int argc, char *argv[])
 	c->width = WIDTH;
 	c->height = HEIGHT;
 	c->time_base.num = 1;
-	c->time_base.den = 30;
-	c->framerate.num = 30;
+	c->time_base.den = FRAMERATE;
+	c->framerate.num = FRAMERATE;
 	c->framerate.den = 1;
 	c->pix_fmt = AV_PIX_FMT_RGB24;
 	c->gop_size = 30*3;
@@ -432,7 +433,7 @@ main(int argc, char *argv[])
 		fflush(stdout);
 		frame->pts = framecount;
 		putframe(fc, vidstream, c, frame, pkt);
-		time += 1.0 / 30;
+		time += 1.0 / FRAMERATE;
 		framecount += 1;
 	}
 
