@@ -834,6 +834,7 @@ for i, staff in pairs(stafforder) do
 	extent.yoff = yoff
 	yoff = yoff + extent.ymax - extent.ymin
 end
+scale = frameheight / yoff
 
 for _, tie in pairs(ties) do
 	local yoff = extents[tie.staff].yoff - extents[tie.staff].ymin
@@ -946,11 +947,11 @@ local toff_base = 0
 function drawframe(time)
 	if snappoints[snapidx + 1] and snappoints[snapidx] < time then
 		snapidx = snapidx + 1
-		toff_base = -rtimings[snappoints[snapidx - 1]] + framewidth / 2
+		toff_base = -rtimings[snappoints[snapidx - 1]]
 	end
 	local xdiff = rtimings[snappoints[snapidx]] - rtimings[snappoints[snapidx - 1]]
 	local delta = xdiff * (time - snappoints[snapidx - 1]) / (snappoints[snapidx] - snappoints[snapidx - 1])
-	local toff = toff_base - delta
+	local toff = toff_base - delta + framewidth / (2*scale)
 
 	if time > lastpoint + 10 then
 		return true
@@ -962,7 +963,7 @@ function drawframe(time)
 			if not d.time.start then goto continue end
 			if d.time.start < time then
 				if d.kind == "glyph" then
-					draw_glyph(d.size, d.glyph, toff + d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
+					draw_glyph(scale*d.size, d.glyph, scale*(toff + d.x - extent.xmin), scale*(d.y - extent.ymin + extent.yoff))
 				elseif d.kind == "line" then
 					local delta = (time - d.time.start) / (d.time.stop - d.time.start)
 					local endx, endy
@@ -976,9 +977,9 @@ function drawframe(time)
 					else
 						endy = math.max(d.y1 + delta*(d.y2 - d.y1), d.y2)
 					end
-					draw_line(d.t, toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy - extent.ymin + extent.yoff)
+					draw_line(scale*d.t, scale*(toff + d.x1 - extent.xmin), scale*(d.y1 - extent.ymin + extent.yoff), scale*(toff + endx - extent.xmin), scale*(endy - extent.ymin + extent.yoff))
 				elseif d.kind == "circle" then
-					draw_circle(d.r, toff + d.x - extent.xmin, d.y - extent.ymin + extent.yoff)
+					draw_circle(scale*d.r, scale*(toff + d.x - extent.xmin), scale*(d.y - extent.ymin + extent.yoff))
 				elseif d.kind == "vshear" then
 					local delta = (time - d.time.start) / (d.time.stop - d.time.start)
 					local endx, endy
@@ -992,9 +993,9 @@ function drawframe(time)
 					else
 						endy = math.max(d.y1 + delta*(d.y2 - d.y1), d.y2)
 					end
-					draw_quad(toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy - extent.ymin + extent.yoff, toff + endx - extent.xmin, endy + d.h - extent.ymin + extent.yoff, toff + d.x1 - extent.xmin, d.y1 + d.h - extent.ymin + extent.yoff)
+					draw_quad(scale*(toff + d.x1 - extent.xmin), scale(d.y1 - extent.ymin + extent.yoff), scale(toff + endx - extent.xmin), scale*(endy - extent.ymin + extent.yoff), scale*(toff + endx - extent.xmin), scale*(endy + d.h - extent.ymin + extent.yoff), scale*(toff + d.x1 - extent.xmin), scale*(d.y1 + d.h - extent.ymin + extent.yoff))
 				elseif d.kind == "quad" then
-					draw_quad(toff + d.x1 - extent.xmin, d.y1 - extent.ymin + extent.yoff, toff + d.x2 - extent.xmin, d.y2 - extent.ymin + extent.yoff, toff + d.x3 - extent.xmin, d.y3 - extent.ymin + extent.yoff, toff + d.x4 - extent.xmin, d.y4 - extent.ymin + extent.yoff)
+					draw_quad(scale*(toff + d.x1 - extent.xmin), scale*(d.y1 - extent.ymin + extent.yoff), scale*(toff + d.x2 - extent.xmin), scale*(d.y2 - extent.ymin + extent.yoff), scale*(toff + d.x3 - extent.xmin), scale*(d.y3 - extent.ymin + extent.yoff), scale*(toff + d.x4 - extent.xmin), scale*(d.y4 - extent.ymin + extent.yoff))
 				end
 			end
 
@@ -1003,7 +1004,7 @@ function drawframe(time)
 
 		-- draw staff
 		for y=0,em*4,em do
-			draw_line(1, toff + xmin, y + extent.yoff - extent.ymin, toff + xmax, y + extent.yoff - extent.ymin)
+			draw_line(scale, scale*(toff + xmin), scale*(y + extent.yoff - extent.ymin), scale*(toff + xmax), scale*(y + extent.yoff - extent.ymin))
 		end
 	end
 
@@ -1016,9 +1017,9 @@ function drawframe(time)
 			local delta = (time - item.time.start) / (item.time.stop - item.time.start)
 			local endy = math.min(y1 + delta*(y2 - y1), y2)
 
-			draw_line(1, toff + item.x, y1, toff + item.x, endy)
+			draw_line(scale, scale*(toff + item.x), scale*(y1), scale*(toff + item.x), scale*(endy))
 			if item.last then
-			draw_line(4, 5 + toff + item.x, y1, 5 + toff + item.x, endy)
+			draw_line(scale*4, scale*(5 + toff + item.x), scale*(y1), scale*(5 + toff + item.x), scale*(endy))
 			end
 		elseif item.kind == "curve" then
 			if item.time.start > time then goto continue end
@@ -1029,7 +1030,7 @@ function drawframe(time)
 				delta = (time - item.time.start) / (item.time.stop - item.time.start)
 			end
 			local endx = item.x0 + delta*(item.x2 - item.x0)
-			draw_curve(delta, toff + item.x0, item.y0, toff + (item.x0 + endx) / 2, (item.y0 + item.y2) / 2 + 20, toff + endx, item.y2)
+			draw_curve(delta, scale, scale*(toff + item.x0), scale*(item.y0), scale*(toff + (item.x0 + endx) / 2), scale*((item.y0 + item.y2) / 2 + 20), scale*(toff + endx), scale*(item.y2))
 		elseif item.kind == "beamseg" then
 			if item.time.start > time then goto continue end
 			local delta
@@ -1049,7 +1050,7 @@ function drawframe(time)
 			else
 				endy = math.max(item.y1 + delta*(item.y2 - item.y1), item.y2)
 			end
-			draw_quad(toff + item.x1, item.y1, toff + endx, endy, toff + endx, endy + item.h, toff + item.x1, item.y1 + item.h)
+			draw_quad(scale*(toff + item.x1), scale*(item.y1), scale*(toff + endx), scale*(endy), scale*(toff + endx), scale*(endy + item.h), scale*(toff + item.x1), scale*(item.y1 + item.h))
 		end
 		::continue::
 	end

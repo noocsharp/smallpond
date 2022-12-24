@@ -17,9 +17,9 @@
 #include <lauxlib.h>
 #include <lualib.h>
 
-#define WIDTH 1280
-#define HEIGHT 720
-#define FRAMERATE 30
+#define WIDTH 3840
+#define HEIGHT 2160
+#define FRAMERATE 60
 
 int luaopen_qmath(lua_State *L);
 
@@ -59,7 +59,8 @@ split_cubic(double t, double x1, double y1, double x2, double y2, double x, doub
 int
 draw_curve(lua_State *L)
 {
-	double t = lua_tonumber(L, -7);
+	double t = lua_tonumber(L, -8);
+	double th = lua_tonumber(L, -7);
 	double x0 = lua_tonumber(L, -6);
 	double y0 = lua_tonumber(L, -5);
 	double x1 = lua_tonumber(L, -4);
@@ -73,8 +74,8 @@ draw_curve(lua_State *L)
 	split_cubic(t, 0, 0, x1 - x0, y1 - y0, x2 - x0, y2 - y0, &q0x, &q0y, &r0x, &r0y, &bx, &by);
 	cairo_move_to(cr, x0, y0);
 	cairo_rel_curve_to(cr, q0x, q0y, r0x, r0y, bx, by);
-	split_cubic(t, 0, 1, x1 - x0, y1 + 3 - y0, x2 - x0, y2 + 1 - y0, &q0x, &q0y, &r0x, &r0y, &bx, &by);
-	cairo_rel_line_to(cr, 0, 1);
+	split_cubic(t, 0, th*1, x1 - x0, y1 + th*3 - y0, x2 - x0, y2 + th*1 - y0, &q0x, &q0y, &r0x, &r0y, &bx, &by);
+	cairo_rel_line_to(cr, 0, th);
 	cairo_rel_curve_to(cr, r0x - bx, r0y - by, q0x - bx, q0y - by, q0x - bx, q0y - by);
 	cairo_line_to(cr, x0, y0);
 	cairo_fill(cr);
@@ -245,6 +246,8 @@ main(int argc, char *argv[])
 	lua_setglobal(L, "draw_quad");
 	lua_pushcfunction(L, glyph_extents);
 	lua_setglobal(L, "glyph_extents");
+	lua_pushnumber(L, HEIGHT);
+	lua_setglobal(L, "frameheight");
 	lua_pushnumber(L, WIDTH);
 	lua_setglobal(L, "framewidth");
 	FT_Library library;
