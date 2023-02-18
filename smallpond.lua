@@ -873,7 +873,9 @@ for _, notes in ipairs(beams) do
 		end
 	end
 
-	notes[1].note.stem.y2 = notes[1].note.stem.y2 + stemextension
+	if notes[1].note.stemdir == 1 then
+		notes[1].note.stem.y2 = y0s + 7*(notes.maxbeams - 2) + beamheight + stemextension
+	end
 
 	for i, entry in ipairs(notes) do
 		if i == 1 then goto continue end
